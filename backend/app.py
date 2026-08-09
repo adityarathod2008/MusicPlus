@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify, redirect, Response
 from flask_cors import CORS
 import yt_dlp
@@ -81,12 +82,16 @@ def send_otp():
         'expires': time.time() + 300 # valid for 5 minutes
     }
     
-    # --- CONFIGURATION: Load from config.py ---
-    try:
-        from config import SENDER_EMAIL, SENDER_PASSWORD
-    except ImportError:
-        SENDER_EMAIL = "your.email@gmail.com"
-        SENDER_PASSWORD = "your-16-digit-app-password"
+    # --- CONFIGURATION: Load from Env Vars or config.py ---
+    SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+    SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
+    
+    if not SENDER_EMAIL or not SENDER_PASSWORD:
+        try:
+            from config import SENDER_EMAIL, SENDER_PASSWORD
+        except ImportError:
+            SENDER_EMAIL = "your.email@gmail.com"
+            SENDER_PASSWORD = "your-16-digit-app-password"
     
     msg = MIMEText(f"Welcome to Music+!\n\nYour 6-digit verification code is: {otp}\n\nThis code will expire in 5 minutes.")
     msg['Subject'] = 'Music+ Login Verification'
