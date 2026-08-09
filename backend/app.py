@@ -3,12 +3,8 @@ from flask import Flask, request, jsonify, redirect, Response
 from flask_cors import CORS
 import yt_dlp
 import requests
-import random
-import time
-import smtplib
 import sqlite3
 from datetime import datetime
-from email.mime.text import MIMEText
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes so the frontend can hit this API
@@ -26,6 +22,7 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             username TEXT NOT NULL,
             password TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
             last_login TEXT NOT NULL
         )
     ''')
@@ -40,6 +37,7 @@ def sync_user():
     email = data.get('email')
     username = data.get('username')
     password = data.get('password')
+    status = data.get('status', 'pending')
     
     if not email or not username:
         return jsonify({"error": "Missing user data"}), 400
@@ -55,12 +53,13 @@ def sync_user():
         user = c.fetchone()
         
         if user:
-            # Update existing user's last login
-            c.execute("UPDATE users SET last_login=?, username=?, password=? WHERE email=?", (now, username, password, email))
+            # Update existing user's last login and status
+            c.execute("UPDATE users SET last_login=?, username=?, password=?, status=? WHERE email=?", 
+                      (now, username, password, status, email))
         else:
             # Insert new user
-            c.execute("INSERT INTO users (email, username, password, last_login) VALUES (?, ?, ?, ?)", 
-                      (email, username, password, now))
+            c.execute("INSERT INTO users (email, username, password, status, last_login) VALUES (?, ?, ?, ?, ?)", 
+                      (email, username, password, status, now))
                       
         conn.commit()
         conn.close()
@@ -69,78 +68,6 @@ def sync_user():
         print(f"Database Error: {e}")
         return jsonify({"error": "Database error"}), 500
 
-@app.route('/api/auth/send-otp', methods=['POST'])
-def send_otp():
-    data = request.json
-    email = data.get('email')
-    if not email:
-        return jsonify({"error": "Email is required"}), 400
-        
-    otp = str(random.randint(100000, 999999))
-    otp_store[email] = {
-        'otp': otp,
-        'expires': time.time() + 300 # valid for 5 minutes
-    }
-    
-    # --- CONFIGURATION: Load from Env Vars or config.py ---
-    SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-    SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
-    
-    if not SENDER_EMAIL or not SENDER_PASSWORD:
-        try:
-            from config import SENDER_EMAIL, SENDER_PASSWORD
-        except ImportError:
-            SENDER_EMAIL = "your.email@gmail.com"
-            SENDER_PASSWORD = "your-16-digit-app-password"
-    
-    msg = MIMEText(f"Welcome to Music+!\n\nYour 6-digit verification code is: {otp}\n\nThis code will expire in 5 minutes.")
-    msg['Subject'] = 'Music+ Login Verification'
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = email
-    
-    try:
-        if SENDER_EMAIL == "your.email@gmail.com":
-            # Fallback if the user hasn't set up their credentials yet
-            print(f"\n==================================================")
-            print(f"SIMULATED EMAIL TO: {email}")
-            print(f"Your Music+ Login OTP is: {otp}")
-            print(f"==================================================\n")
-            return jsonify({"message": "App Password not configured! Simulated OTP sent to backend console."})
-            
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            # Remove spaces from the app password just in case
-            server.login(SENDER_EMAIL, SENDER_PASSWORD.replace(" ", ""))
-            server.send_message(msg)
-            
-        return jsonify({"message": "OTP sent successfully to your email!"})
-    except Exception as e:
-        print(f"SMTP Error: {e}")
-        return jsonify({"error": "Failed to send email. Check backend configuration."}), 500
-
-@app.route('/api/auth/verify-otp', methods=['POST'])
-def verify_otp():
-    data = request.json
-    email = data.get('email')
-    user_otp = data.get('otp')
-    
-    if not email or not user_otp:
-        return jsonify({"error": "Email and OTP required"}), 400
-        
-    if email not in otp_store:
-        return jsonify({"error": "No OTP requested for this email"}), 400
-        
-    stored_data = otp_store[email]
-    
-    if time.time() > stored_data['expires']:
-        del otp_store[email]
-        return jsonify({"error": "OTP has expired"}), 400
-        
-    if stored_data['otp'] != user_otp:
-        return jsonify({"error": "Invalid OTP"}), 400
-        
-    del otp_store[email] # Clear it after successful verification
-    return jsonify({"message": "Verification successful"})
 
 @app.route('/search', methods=['GET'])
 def search():

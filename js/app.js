@@ -43,9 +43,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const usernameGroup = document.getElementById('username-group');
     const emailInput = document.getElementById('auth-email');
     const usernameInput = document.getElementById('auth-username');
-    const otpInput = document.getElementById('auth-otp');
-    const otpGroup = document.getElementById('otp-group');
-    const sendOtpBtn = document.getElementById('send-otp-btn');
     const authSubmitBtn = document.getElementById('auth-submit-btn');
     
     // State
@@ -245,8 +242,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 authToggleLink.textContent = "Sign up";
                 usernameGroup.style.display = 'none';
                 usernameInput.required = false;
-                sendOtpBtn.style.display = 'none';
-                otpGroup.style.display = 'none';
             } else {
                 authTitle.textContent = "Sign up for Music+";
                 authSubmitBtn.textContent = "Sign Up";
@@ -254,48 +249,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 authToggleLink.textContent = "Log in";
                 usernameGroup.style.display = 'block';
                 usernameInput.required = true;
-                sendOtpBtn.style.display = 'block';
-                otpGroup.style.display = 'none';
             }
             authError.style.display = 'none';
-        });
-        
-        sendOtpBtn.addEventListener('click', async () => {
-            const email = emailInput.value;
-            if (!email) {
-                authError.textContent = "Please enter your email first.";
-                authError.style.display = 'block';
-                return;
-            }
-            authError.style.display = 'none';
-            sendOtpBtn.disabled = true;
-            sendOtpBtn.textContent = 'Sending...';
-            
-            try {
-                const response = await fetch('https://f467d44a9f34ac.lhr.life/api/auth/send-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                });
-                
-                const data = await response.json();
-                if (response.ok) {
-                    otpGroup.style.display = 'block';
-                    otpInput.required = true;
-                    sendOtpBtn.textContent = 'OTP Sent';
-                    authError.style.color = '#1DB954';
-                    authError.textContent = "OTP sent! Check the backend console.";
-                    authError.style.display = 'block';
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (err) {
-                authError.style.color = 'var(--error)';
-                authError.textContent = err.message || "Failed to send OTP.";
-                authError.style.display = 'block';
-                sendOtpBtn.disabled = false;
-                sendOtpBtn.textContent = 'Send OTP';
-            }
         });
         
         authForm.addEventListener('submit', handleAuthSubmit);
@@ -396,7 +351,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function handleAuthSubmit(e) {
         e.preventDefault();
         const email = emailInput.value;
-        const otp = otpInput.value;
         const user = usernameInput.value;
         const password = document.getElementById('auth-password').value;
         
@@ -407,7 +361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (foundUser) {
                     if (foundUser.status === 'pending') {
                         authError.style.color = 'var(--error)';
-                        authError.textContent = "Your account is pending Admin approval.";
+                        authError.textContent = "Your account is pending Admin approval. Please check back later.";
                         authError.style.display = 'block';
                         return;
                     }
@@ -435,58 +389,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                     authError.style.display = 'block';
                 }
             } else {
-                // SIGNUP MODE: Needs OTP Verification
-                if (otpGroup.style.display === 'none') {
-                    authError.style.color = 'var(--error)';
-                    authError.textContent = "Please request an OTP first.";
-                    authError.style.display = 'block';
-                    return;
-                }
-                
-                // Verify OTP via Flask Backend
-                const response = await fetch('https://f467d44a9f34ac.lhr.life/api/auth/verify-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, otp })
-                });
-                
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.error);
-                }
-                
-                // OTP is valid! Register the user
+                // SIGNUP MODE: Create user as pending
                 if (usersDB.find(u => u.email === email)) {
                     authError.style.color = 'var(--error)';
-                    authError.textContent = "Email already registered.";
+                    authError.textContent = "Email already registered. Please log in.";
                     authError.style.display = 'block';
                     return;
                 }
+                
                 const newUser = {
                     id: 'usr_' + Date.now(),
                     email: email,
                     username: user,
                     password: password,
-                    status: 'approved', // Auto-approve OTP-verified accounts
+                    status: 'pending', // Requires admin approval
                     likedSongs: []
                 };
                 usersDB.push(newUser);
                 localStorage.setItem('usersDB', JSON.stringify(usersDB));
                 
-                // Instantly Log in the new user
-                currentUser = newUser;
-                likedSongs = currentUser.likedSongs || [];
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                
-                // Sync to backend DB
-                syncUserToBackend(currentUser);
+                // Also create in backend DB with pending status
+                syncUserToBackend(newUser);
                 
                 authForm.reset();
-                otpGroup.style.display = 'none';
-                sendOtpBtn.disabled = false;
-                sendOtpBtn.textContent = 'Send OTP';
-                authError.style.display = 'none';
-                checkAuthState();
+                authError.style.color = '#1DB954';
+                authError.textContent = "Account created! Please wait for the Admin to approve your account before logging in.";
+                authError.style.display = 'block';
+                
+                // Switch back to login view but leave the success message visible
+                isLoginMode = true;
+                authTitle.textContent = "Log in to Music+";
+                authSubmitBtn.textContent = "Log In";
+                authToggleText.textContent = "Don't have an account?";
+                authToggleLink.textContent = "Sign up";
+                usernameGroup.style.display = 'none';
+                usernameInput.required = false;
             }
         } catch (err) {
             authError.style.color = 'var(--error)';
@@ -503,7 +440,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 body: JSON.stringify({
                     email: user.email,
                     username: user.username,
-                    password: user.password
+                    password: user.password,
+                    status: user.status
                 })
             });
         } catch (err) {
@@ -559,6 +497,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (userIndex > -1) {
                     usersDB[userIndex].status = 'approved';
                     localStorage.setItem('usersDB', JSON.stringify(usersDB));
+                    syncUserToBackend(usersDB[userIndex]);
                     renderUsersTable();
                 }
             });
