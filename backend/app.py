@@ -47,8 +47,10 @@ def send_otp():
             print(f"==================================================\n")
             return jsonify({"message": "App Password not configured! Simulated OTP sent to backend console."})
             
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            # Remove spaces from the app password just in case
+            server.login(SENDER_EMAIL, SENDER_PASSWORD.replace(" ", ""))
             server.send_message(msg)
             
         return jsonify({"message": "OTP sent successfully to your email!"})
