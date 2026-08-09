@@ -228,7 +228,7 @@ class AudioPlayer {
                 }
             }
             
-            const response = await fetch(`http://127.0.0.1:5000/search?q=${encodeURIComponent(searchQuery)}`);
+            const response = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(searchQuery)}`);
             const data = await response.json();
             
             if (data.results && data.results.length > 0) {
@@ -239,7 +239,7 @@ class AudioPlayer {
                 const songsToAdd = newSongs.slice(0, 10);
                 for (const song of songsToAdd) {
                     if (!song.src) {
-                        song.src = `http://127.0.0.1:5000/stream/${song.id}`;
+                        song.src = `${BACKEND_URL}/stream/${song.id}`;
                     }
                     this.queue.push(song);
                 }
