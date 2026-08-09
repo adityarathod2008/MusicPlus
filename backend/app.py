@@ -4,6 +4,8 @@ import yt_dlp
 import requests
 import random
 import time
+import smtplib
+from email.mime.text import MIMEText
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes so the frontend can hit this API
@@ -24,13 +26,35 @@ def send_otp():
         'expires': time.time() + 300 # valid for 5 minutes
     }
     
-    # Simulate sending email by printing to the backend console
-    print(f"\n==================================================")
-    print(f"📧 SIMULATED EMAIL TO: {email}")
-    print(f"🔑 Your Music+ Login OTP is: {otp}")
-    print(f"==================================================\n")
+    # --- CONFIGURATION: Load from config.py ---
+    try:
+        from config import SENDER_EMAIL, SENDER_PASSWORD
+    except ImportError:
+        SENDER_EMAIL = "your.email@gmail.com"
+        SENDER_PASSWORD = "your-16-digit-app-password"
     
-    return jsonify({"message": "OTP sent successfully! Check your console."})
+    msg = MIMEText(f"Welcome to Music+!\n\nYour 6-digit verification code is: {otp}\n\nThis code will expire in 5 minutes.")
+    msg['Subject'] = 'Music+ Login Verification'
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = email
+    
+    try:
+        if SENDER_EMAIL == "your.email@gmail.com":
+            # Fallback if the user hasn't set up their credentials yet
+            print(f"\n==================================================")
+            print(f"SIMULATED EMAIL TO: {email}")
+            print(f"Your Music+ Login OTP is: {otp}")
+            print(f"==================================================\n")
+            return jsonify({"message": "App Password not configured! Simulated OTP sent to backend console."})
+            
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+            
+        return jsonify({"message": "OTP sent successfully to your email!"})
+    except Exception as e:
+        print(f"SMTP Error: {e}")
+        return jsonify({"error": "Failed to send email. Check backend configuration."}), 500
 
 @app.route('/api/auth/verify-otp', methods=['POST'])
 def verify_otp():
