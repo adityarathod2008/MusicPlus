@@ -187,8 +187,8 @@ class AudioPlayer {
             this.playSong(this.queue[this.currentSongIndex], this.currentSongIndex);
         } else {
             this.currentSongIndex++;
-            // Check if we need to buffer more songs (if less than 5 songs remain)
-            if (this.queue.length - this.currentSongIndex <= 5) {
+            // Check if we need to buffer more songs (if less than 10 songs remain)
+            if (this.queue.length - this.currentSongIndex <= 10) {
                 this.bufferUpcomingSongs();
             }
             
@@ -235,8 +235,8 @@ class AudioPlayer {
                 const existingIds = new Set(this.queue.map(s => s.id));
                 const newSongs = data.results.filter(s => !existingIds.has(s.id));
                 
-                // Add up to 5 new songs to the queue buffer
-                const songsToAdd = newSongs.slice(0, 5);
+                // Add up to 10 new songs to the queue buffer
+                const songsToAdd = newSongs.slice(0, 10);
                 for (const song of songsToAdd) {
                     if (!song.src) {
                         song.src = `http://127.0.0.1:5000/stream/${song.id}`;

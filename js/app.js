@@ -360,6 +360,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('main-content').style.filter = 'none';
             loginBtn.style.display = 'none';
             userAvatar.style.display = 'flex';
+            
+            // Set Avatar to First Letter
+            userAvatar.innerHTML = currentUser.username.charAt(0).toUpperCase();
+            userAvatar.style.background = 'var(--accent-color)';
+            userAvatar.style.color = 'white';
+            userAvatar.style.justifyContent = 'center';
+            userAvatar.style.alignItems = 'center';
+            userAvatar.style.fontWeight = 'bold';
+            userAvatar.style.fontSize = '18px';
+            
             logoutBtn.style.display = 'block';
             userAvatar.setAttribute('title', currentUser.username);
             updateGreeting();
@@ -695,6 +705,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (audioPlayer.currentSongIndex > i) {
                         audioPlayer.currentSongIndex--;
                     }
+                    
+                    // Buffer if we dropped below 10
+                    if (audioPlayer.queue.length - audioPlayer.currentSongIndex <= 10) {
+                        audioPlayer.bufferUpcomingSongs();
+                    }
+                    
                     audioPlayer.saveSession();
                     renderQueue();
                 };
@@ -874,7 +890,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         likedSongs.forEach((song, i) => {
             const item = document.createElement('div');
             item.style.display = 'grid';
-            item.style.gridTemplateColumns = '40px 1fr 1fr 60px';
+            item.style.gridTemplateColumns = '40px 1fr 1fr 60px 40px';
             item.style.alignItems = 'center';
             item.style.padding = '8px 16px';
             item.style.borderRadius = '4px';
@@ -895,6 +911,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div style="color: var(--text-subdued); font-size: 14px;">${song.album}</div>
                 <div style="color: var(--text-subdued); font-size: 14px;">${song.duration}</div>
             `;
+            
+            // Unlike Button
+            const unlikeBtn = document.createElement('button');
+            unlikeBtn.innerHTML = '<i class="fas fa-heart"></i>';
+            unlikeBtn.style.color = 'var(--accent-color)';
+            unlikeBtn.style.background = 'none';
+            unlikeBtn.style.border = 'none';
+            unlikeBtn.style.cursor = 'pointer';
+            unlikeBtn.onclick = (e) => {
+                e.stopPropagation();
+                likedSongs.splice(i, 1);
+                
+                currentUser.likedSongs = likedSongs;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                const dbIndex = usersDB.findIndex(u => u.id === currentUser.id);
+                if(dbIndex > -1) {
+                    usersDB[dbIndex] = currentUser;
+                    localStorage.setItem('usersDB', JSON.stringify(usersDB));
+                }
+                
+                updateLikeButtonsState();
+                renderLikedSongs();
+            };
+            item.appendChild(unlikeBtn);
             
             item.addEventListener('click', () => {
                 audioPlayer.queue = likedSongs;
