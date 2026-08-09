@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (downloadBtn) {
             downloadBtn.addEventListener('click', () => {
                 if (currentActiveSong && currentActiveSong.id) {
-                    const downloadUrl = `http://127.0.0.1:5000/download/${currentActiveSong.id}`;
+                    const downloadUrl = `https://f467d44a9f34ac.lhr.life/download/${currentActiveSong.id}`;
                     window.open(downloadUrl, '_blank');
                 } else if (currentActiveSong && currentActiveSong.src) {
                     // For local uploads
@@ -272,7 +272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             sendOtpBtn.textContent = 'Sending...';
             
             try {
-                const response = await fetch('http://127.0.0.1:5000/api/auth/send-otp', {
+                const response = await fetch('https://f467d44a9f34ac.lhr.life/api/auth/send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 // Verify OTP via Flask Backend
-                const response = await fetch('http://127.0.0.1:5000/api/auth/verify-otp', {
+                const response = await fetch('https://f467d44a9f34ac.lhr.life/api/auth/verify-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, otp })
@@ -497,7 +497,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function syncUserToBackend(user) {
         try {
-            await fetch('http://127.0.0.1:5000/api/sync-user', {
+            await fetch('https://f467d44a9f34ac.lhr.life/api/sync-user', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
