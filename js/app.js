@@ -238,15 +238,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         authToggleLink.addEventListener('click', (e) => {
             e.preventDefault();
             isLoginMode = !isLoginMode;
-            authTitle.textContent = isLoginMode ? "Log in to Music+" : "Sign up for Music+";
-            authToggleText.textContent = isLoginMode ? "Don't have an account?" : "Already have an account?";
-            authToggleLink.textContent = isLoginMode ? "Sign up" : "Log in";
-            usernameGroup.style.display = isLoginMode ? 'none' : 'flex';
-            usernameInput.required = !isLoginMode;
+            if (isLoginMode) {
+                authTitle.textContent = "Log in to Music+";
+                authSubmitBtn.textContent = "Log In";
+                authToggleText.textContent = "Don't have an account?";
+                authToggleLink.textContent = "Sign up";
+                usernameGroup.style.display = 'none';
+                usernameInput.required = false;
+                sendOtpBtn.style.display = 'none';
+                otpGroup.style.display = 'none';
+            } else {
+                authTitle.textContent = "Sign up for Music+";
+                authSubmitBtn.textContent = "Sign Up";
+                authToggleText.textContent = "Already have an account?";
+                authToggleLink.textContent = "Log in";
+                usernameGroup.style.display = 'block';
+                usernameInput.required = true;
+                sendOtpBtn.style.display = 'block';
+                otpGroup.style.display = 'none';
+            }
             authError.style.display = 'none';
-            otpGroup.style.display = 'none';
-            sendOtpBtn.disabled = false;
-            sendOtpBtn.textContent = 'Send OTP';
         });
         
         sendOtpBtn.addEventListener('click', async () => {
@@ -387,30 +398,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const email = emailInput.value;
         const otp = otpInput.value;
         const user = usernameInput.value;
-        
-        // Ensure OTP has been sent and entered
-        if (otpGroup.style.display === 'none') {
-            authError.style.color = 'var(--error)';
-            authError.textContent = "Please request an OTP first.";
-            authError.style.display = 'block';
-            return;
-        }
+        const password = document.getElementById('auth-password').value;
         
         try {
-            // Very OTP via Flask Backend
-            const response = await fetch('http://127.0.0.1:5000/api/auth/verify-otp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, otp })
-            });
-            
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error);
-            }
-            
-            // OTP is valid! Proceed with Login / Register
             if (isLoginMode) {
+                // LOGIN MODE: Only check Email and Password
                 const foundUser = usersDB.find(u => u.email === email);
                 if (foundUser) {
                     if (foundUser.status === 'pending') {
@@ -419,14 +411,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                         authError.style.display = 'block';
                         return;
                     }
+                    if (foundUser.password !== password) {
+                        authError.style.color = 'var(--error)';
+                        authError.textContent = "Incorrect password.";
+                        authError.style.display = 'block';
+                        return;
+                    }
+                    
+                    // Success!
                     currentUser = foundUser;
                     likedSongs = currentUser.likedSongs || [];
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     
                     authForm.reset();
-                    otpGroup.style.display = 'none';
-                    sendOtpBtn.disabled = false;
-                    sendOtpBtn.textContent = 'Send OTP';
                     authError.style.display = 'none';
                     checkAuthState();
                 } else {
@@ -435,6 +432,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                     authError.style.display = 'block';
                 }
             } else {
+                // SIGNUP MODE: Needs OTP Verification
+                if (otpGroup.style.display === 'none') {
+                    authError.style.color = 'var(--error)';
+                    authError.textContent = "Please request an OTP first.";
+                    authError.style.display = 'block';
+                    return;
+                }
+                
+                // Verify OTP via Flask Backend
+                const response = await fetch('http://127.0.0.1:5000/api/auth/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, otp })
+                });
+                
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error);
+                }
+                
+                // OTP is valid! Register the user
                 if (usersDB.find(u => u.email === email)) {
                     authError.style.color = 'var(--error)';
                     authError.textContent = "Email already registered.";
@@ -445,7 +463,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     id: 'usr_' + Date.now(),
                     email: email,
                     username: user,
-                    password: 'N/A',
+                    password: password,
                     status: 'approved', // Auto-approve OTP-verified accounts
                     likedSongs: []
                 };
@@ -470,6 +488,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             authError.style.display = 'block';
         }
     }
+
     
     function handleLogout() {
         currentUser = null;
