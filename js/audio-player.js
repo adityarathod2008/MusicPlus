@@ -48,7 +48,13 @@ class AudioPlayer {
         this.repeatBtn.addEventListener('click', () => this.toggleRepeat());
         this.muteBtn.addEventListener('click', () => this.toggleMute());
         
-        this.audio.addEventListener('timeupdate', () => this.updateProgress());
+        this.audio.addEventListener('timeupdate', () => {
+            this.updateProgress();
+            // Throttle saveSession to every 5 seconds to avoid excessive writes
+            if (Math.floor(this.audio.currentTime) % 5 === 0) {
+                this.saveSession();
+            }
+        });
         this.audio.addEventListener('ended', () => this.handleSongEnd());
         this.audio.addEventListener('loadedmetadata', () => {
             this.totalTimeEl.textContent = this.formatTime(this.audio.duration);
@@ -76,7 +82,51 @@ class AudioPlayer {
             if (e.code === 'ArrowDown') { this.audio.volume = Math.max(0, this.audio.volume - 0.1); this.updateVolumeUI(); }
         });
         
-        // Initialize Queue with default songs
+        // Initialize Session or Default Queue
+        this.loadSession();
+    }
+    
+    saveSession() {
+        if (!this.queue || this.queue.length === 0) return;
+        const sessionData = {
+            queue: this.queue,
+            currentIndex: this.currentSongIndex,
+            currentTime: this.audio.currentTime,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('musicplus_session', JSON.stringify(sessionData));
+    }
+    
+    loadSession() {
+        const savedSession = localStorage.getItem('musicplus_session');
+        if (savedSession) {
+            try {
+                const session = JSON.parse(savedSession);
+                if (session.queue && session.queue.length > 0) {
+                    this.queue = session.queue;
+                    this.currentSongIndex = session.currentIndex || 0;
+                    this.loadSong(this.queue[this.currentSongIndex]);
+                    
+                    // Restore time once metadata is loaded
+                    const timeToRestore = session.currentTime || 0;
+                    const onMeta = () => {
+                        this.audio.currentTime = timeToRestore;
+                        this.audio.removeEventListener('loadedmetadata', onMeta);
+                    };
+                    this.audio.addEventListener('loadedmetadata', onMeta);
+                    
+                    // Render queue in UI if available
+                    if (typeof renderQueue === 'function') {
+                        renderQueue();
+                    }
+                    return;
+                }
+            } catch (e) {
+                console.error("Failed to load session", e);
+            }
+        }
+        
+        // Fallback to default behavior if no session
         this.queue = [...songs];
         if(this.queue.length > 0) {
             this.loadSong(this.queue[0]);
@@ -135,53 +185,87 @@ class AudioPlayer {
             }
             this.currentSongIndex = randomIndex;
             this.playSong(this.queue[this.currentSongIndex], this.currentSongIndex);
+    async playNext() {
+        if (this.queue.length === 0) return;
+        
+        if (this.shuffle) {
+            let randomIndex = this.currentSongIndex;
+            while(randomIndex === this.currentSongIndex && this.queue.length > 1) {
+                randomIndex = Math.floor(Math.random() * this.queue.length);
+            }
+            this.currentSongIndex = randomIndex;
+            this.playSong(this.queue[this.currentSongIndex], this.currentSongIndex);
         } else {
             this.currentSongIndex++;
+            // Check if we need to buffer more songs (if less than 5 songs remain)
+            if (this.queue.length - this.currentSongIndex <= 5) {
+                this.bufferUpcomingSongs();
+            }
+            
             if (this.currentSongIndex >= this.queue.length) {
-                // Vibe Matching Endless Queue
-                this.playPauseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; // Show loading while fetching vibe
-                
-                try {
-                    const lastSong = this.queue[this.queue.length - 1];
-                    // Search for the artist of the last song to keep the same vibe
-                    const response = await fetch(`http://127.0.0.1:5000/search?q=${encodeURIComponent(lastSong.artist + ' song')}`);
-                    const data = await response.json();
-                    
-                    if (data.results && data.results.length > 0) {
-                        // Filter out songs already in the queue to prevent repeats
-                        const existingIds = new Set(this.queue.map(s => s.id));
-                        const newSongs = data.results.filter(s => !existingIds.has(s.id));
-                        
-                        if (newSongs.length > 0) {
-                            // Pick a random song from the new vibe-matched results
-                            const nextVibeSong = newSongs[Math.floor(Math.random() * newSongs.length)];
-                            // Ensure it has a constructed src
-                            if (!nextVibeSong.src) {
-                                nextVibeSong.src = `http://127.0.0.1:5000/stream/${nextVibeSong.id}`;
-                            }
-                            this.queue.push(nextVibeSong);
-                        } else {
-                            // Fallback if we exhausted the artist
-                            const randomFallback = songs[Math.floor(Math.random() * songs.length)];
-                            this.queue.push(randomFallback);
-                        }
-                    } else {
-                        // Fallback to global list
-                        const randomFallback = songs[Math.floor(Math.random() * songs.length)];
-                        this.queue.push(randomFallback);
-                    }
-                } catch (err) {
-                    console.error("Vibe match failed", err);
-                    const randomFallback = songs[Math.floor(Math.random() * songs.length)];
-                    this.queue.push(randomFallback);
-                }
-                
-                // Re-render the queue UI
-                if (typeof renderQueue === 'function') {
-                    renderQueue();
+                // If it still runs out despite buffering, just wait for buffer to finish
+                this.playPauseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                await this.bufferUpcomingSongs();
+            }
+            
+            this.playSong(this.queue[this.currentSongIndex], this.currentSongIndex);
+            this.saveSession();
+        }
+    }
+    
+    async bufferUpcomingSongs() {
+        if (this.isBufferingQueue) return;
+        this.isBufferingQueue = true;
+        
+        try {
+            // Recommendation Engine based on Preferences
+            let searchQuery = "";
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            
+            // 50% chance to use user's play history/liked songs, 50% chance to use last played song
+            if (currentUser && Math.random() > 0.5 && (currentUser.playHistory?.length > 0 || currentUser.likedSongs?.length > 0)) {
+                // Pick a random song from their history or likes to base the vibe on
+                const combinedPrefs = [...(currentUser.playHistory || []), ...(currentUser.likedSongs || [])];
+                const randomPref = combinedPrefs[Math.floor(Math.random() * combinedPrefs.length)];
+                searchQuery = randomPref.artist + " song";
+            } else {
+                // Fallback to the current/last song's artist
+                const lastSong = this.queue[this.queue.length - 1] || this.queue[this.currentSongIndex];
+                if (lastSong) {
+                    searchQuery = lastSong.artist + " song";
+                } else {
+                    searchQuery = "trending music";
                 }
             }
-            this.playSong(this.queue[this.currentSongIndex], this.currentSongIndex);
+            
+            const response = await fetch(`http://127.0.0.1:5000/search?q=${encodeURIComponent(searchQuery)}`);
+            const data = await response.json();
+            
+            if (data.results && data.results.length > 0) {
+                const existingIds = new Set(this.queue.map(s => s.id));
+                const newSongs = data.results.filter(s => !existingIds.has(s.id));
+                
+                // Add up to 5 new songs to the queue buffer
+                const songsToAdd = newSongs.slice(0, 5);
+                for (const song of songsToAdd) {
+                    if (!song.src) {
+                        song.src = `http://127.0.0.1:5000/stream/${song.id}`;
+                    }
+                    this.queue.push(song);
+                }
+            } else {
+                // Fallback to static global list
+                const randomFallback = songs[Math.floor(Math.random() * songs.length)];
+                this.queue.push(randomFallback);
+            }
+        } catch (err) {
+            console.error("Queue buffer failed", err);
+        } finally {
+            this.isBufferingQueue = false;
+            if (typeof renderQueue === 'function') {
+                renderQueue();
+            }
+            this.saveSession();
         }
     }
 

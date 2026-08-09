@@ -117,6 +117,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             lyricsSync.loadLyrics(song.lyrics);
             updateLikeButtonsState();
             visualizer.init(); // Init audio context on first play
+            
+            // Add to Play History for Recommendations
+            if (currentUser) {
+                if (!currentUser.playHistory) currentUser.playHistory = [];
+                // Only add if it's not the same as the last played to prevent spam
+                if (currentUser.playHistory.length === 0 || currentUser.playHistory[currentUser.playHistory.length - 1].id !== song.id) {
+                    currentUser.playHistory.push(song);
+                    // Keep history capped at 50 to save space
+                    if (currentUser.playHistory.length > 50) currentUser.playHistory.shift();
+                    
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    
+                    // Update in Users DB array
+                    const dbIndex = usersDB.findIndex(u => u.id === currentUser.id);
+                    if(dbIndex > -1) {
+                        usersDB[dbIndex] = currentUser;
+                        localStorage.setItem('usersDB', JSON.stringify(usersDB));
+                    }
+                }
+            }
         });
         
         // Drawer toggles
@@ -675,6 +695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (audioPlayer.currentSongIndex > i) {
                         audioPlayer.currentSongIndex--;
                     }
+                    audioPlayer.saveSession();
                     renderQueue();
                 };
                 item.appendChild(delBtn);
@@ -715,6 +736,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     audioPlayer.currentSongIndex++;
                 }
                 
+                audioPlayer.saveSession();
                 renderQueue();
             });
             
@@ -781,6 +803,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Play clicked song, then queue the global songs (excluding the clicked one) to provide variety
                 audioPlayer.queue = [song, ...songs.filter(s => s.id !== song.id)];
                 audioPlayer.playSong(song, 0);
+                audioPlayer.saveSession();
             });
             searchResultsList.appendChild(item);
         });
