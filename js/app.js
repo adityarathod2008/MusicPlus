@@ -445,33 +445,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     id: 'usr_' + Date.now(),
                     email: email,
                     username: user,
-                    password: 'N/A', // Password is no longer used, OTP replaces it
-                    status: 'pending',
+                    password: 'N/A',
+                    status: 'approved', // Auto-approve OTP-verified accounts
                     likedSongs: []
                 };
                 usersDB.push(newUser);
                 localStorage.setItem('usersDB', JSON.stringify(usersDB));
                 
-                authError.style.color = '#1DB954';
-                authError.textContent = "Registration successful! Awaiting Admin approval.";
-                authError.style.display = 'block';
+                // Instantly Log in the new user
+                currentUser = newUser;
+                likedSongs = currentUser.likedSongs || [];
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
                 authForm.reset();
                 otpGroup.style.display = 'none';
                 sendOtpBtn.disabled = false;
                 sendOtpBtn.textContent = 'Send OTP';
-                
-                // Switch back to login mode
-                setTimeout(() => {
-                    isLoginMode = true;
-                    authTitle.textContent = "Log in to Music+";
-                    authSubmitBtn.textContent = "Log In";
-                    authToggleText.textContent = "Don't have an account?";
-                    authToggleLink.textContent = "Sign up";
-                    usernameGroup.style.display = 'none';
-                    usernameInput.required = false;
-                    authError.style.color = 'var(--error)';
-                    authError.style.display = 'none';
-                }, 3000);
+                authError.style.display = 'none';
+                checkAuthState();
             }
         } catch (err) {
             authError.style.color = 'var(--error)';
