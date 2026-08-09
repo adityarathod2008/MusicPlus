@@ -185,16 +185,6 @@ class AudioPlayer {
             }
             this.currentSongIndex = randomIndex;
             this.playSong(this.queue[this.currentSongIndex], this.currentSongIndex);
-    async playNext() {
-        if (this.queue.length === 0) return;
-        
-        if (this.shuffle) {
-            let randomIndex = this.currentSongIndex;
-            while(randomIndex === this.currentSongIndex && this.queue.length > 1) {
-                randomIndex = Math.floor(Math.random() * this.queue.length);
-            }
-            this.currentSongIndex = randomIndex;
-            this.playSong(this.queue[this.currentSongIndex], this.currentSongIndex);
         } else {
             this.currentSongIndex++;
             // Check if we need to buffer more songs (if less than 5 songs remain)
