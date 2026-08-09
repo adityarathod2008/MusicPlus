@@ -423,6 +423,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     likedSongs = currentUser.likedSongs || [];
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     
+                    // Sync to backend DB
+                    syncUserToBackend(currentUser);
+                    
                     authForm.reset();
                     authError.style.display = 'none';
                     checkAuthState();
@@ -475,6 +478,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 likedSongs = currentUser.likedSongs || [];
                 localStorage.setItem('currentUser', JSON.stringify(currentUser));
                 
+                // Sync to backend DB
+                syncUserToBackend(currentUser);
+                
                 authForm.reset();
                 otpGroup.style.display = 'none';
                 sendOtpBtn.disabled = false;
@@ -489,6 +495,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    async function syncUserToBackend(user) {
+        try {
+            await fetch('http://127.0.0.1:5000/api/sync-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: user.email,
+                    username: user.username,
+                    password: user.password
+                })
+            });
+        } catch (err) {
+            console.error("Failed to sync user to backend:", err);
+        }
+    }
     
     function handleLogout() {
         currentUser = null;

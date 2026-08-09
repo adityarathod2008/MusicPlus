@@ -5,6 +5,8 @@ import requests
 import random
 import time
 import smtplib
+import sqlite3
+from datetime import datetime
 from email.mime.text import MIMEText
 
 app = Flask(__name__)
@@ -12,6 +14,59 @@ CORS(app)  # Enable CORS for all routes so the frontend can hit this API
 
 # Temporary store for OTPs: { email: { 'otp': '123456', 'expires': timestamp } }
 otp_store = {}
+
+# Initialize SQLite Database
+def init_db():
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL,
+            last_login TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+@app.route('/api/sync-user', methods=['POST'])
+def sync_user():
+    data = request.json
+    email = data.get('email')
+    username = data.get('username')
+    password = data.get('password')
+    
+    if not email or not username:
+        return jsonify({"error": "Missing user data"}), 400
+        
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    try:
+        conn = sqlite3.connect('database.db')
+        c = conn.cursor()
+        
+        # Check if user exists
+        c.execute("SELECT id FROM users WHERE email=?", (email,))
+        user = c.fetchone()
+        
+        if user:
+            # Update existing user's last login
+            c.execute("UPDATE users SET last_login=?, username=?, password=? WHERE email=?", (now, username, password, email))
+        else:
+            # Insert new user
+            c.execute("INSERT INTO users (email, username, password, last_login) VALUES (?, ?, ?, ?)", 
+                      (email, username, password, now))
+                      
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "User synced to backend successfully"})
+    except Exception as e:
+        print(f"Database Error: {e}")
+        return jsonify({"error": "Database error"}), 500
 
 @app.route('/api/auth/send-otp', methods=['POST'])
 def send_otp():
