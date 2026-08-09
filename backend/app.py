@@ -125,7 +125,7 @@ def search():
 def download(video_id):
     # This endpoint gets the streaming URL and forces a download
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'quiet': True,
         'no_warnings': True,
     }
@@ -166,7 +166,7 @@ def download(video_id):
 def stream(video_id):
     # This endpoint gets the streaming URL and proxies it to fix CORS
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'quiet': True,
         'no_warnings': True,
     }
