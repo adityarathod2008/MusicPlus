@@ -63,6 +63,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             likedSongs: []
         });
         localStorage.setItem('usersDB', JSON.stringify(usersDB));
+    }
+    
+    // Seed Demo Account
+    const demoUser = usersDB.find(u => u.email === 'demo@musicplus.com');
+    if (!demoUser) {
+        usersDB.push({
+            id: 'demo_1',
+            email: 'demo@musicplus.com',
+            username: 'Demo User',
+            password: 'demo123',
+            status: 'approved',
+            likedSongs: []
+        });
+        localStorage.setItem('usersDB', JSON.stringify(usersDB));
     } else {
         // Force reset password for locked out user
         adminUser.password = 'admin123';
