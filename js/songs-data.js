@@ -2,9 +2,9 @@ let songs = [];
 const genres = ["All", "Electronic", "Hip-Hop", "Pop", "Lo-Fi", "Rock"];
 const playlists = [];
 
-const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+const BACKEND_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') 
     ? 'http://127.0.0.1:5000' 
-    : 'https://music-plus-backend.onrender.com';
+    : 'https://5c529603aab9bc.lhr.life';
 
 async function loadTrendingSongs() {
     try {
