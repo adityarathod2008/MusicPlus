@@ -102,8 +102,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     async function initData() {
         document.getElementById('greeting').textContent = "Fetching Trending Music...";
+        await fetchUsersFromBackend();
         await loadTrendingSongs();
         updateGreeting();
+    }
+    
+    async function fetchUsersFromBackend() {
+        try {
+            const response = await fetch(`${BACKEND_URL}/api/users`);
+            const data = await response.json();
+            if (data && data.users) {
+                // Merge backend users with local users (backend wins)
+                data.users.forEach(backendUser => {
+                    const localIndex = usersDB.findIndex(u => u.email === backendUser.email);
+                    if (localIndex > -1) {
+                        usersDB[localIndex].status = backendUser.status;
+                        usersDB[localIndex].password = backendUser.password;
+                    } else {
+                        // Include likedSongs = [] for new users from backend
+                        usersDB.push({...backendUser, likedSongs: []});
+                    }
+                });
+                localStorage.setItem('usersDB', JSON.stringify(usersDB));
+                
+                // Update current user if logged in
+                if (currentUser) {
+                    const updatedMe = usersDB.find(u => u.email === currentUser.email);
+                    if (updatedMe) {
+                        currentUser.status = updatedMe.status;
+                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Failed to fetch users from backend:", err);
+        }
     }
     
     function updateGreeting() {
@@ -161,7 +194,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (downloadBtn) {
             downloadBtn.addEventListener('click', () => {
                 if (currentActiveSong && currentActiveSong.id) {
-                    const downloadUrl = `https://f467d44a9f34ac.lhr.life/download/${currentActiveSong.id}`;
+                    const downloadUrl = `${BACKEND_URL}/download/${currentActiveSong.id}`;
                     window.open(downloadUrl, '_blank');
                 } else if (currentActiveSong && currentActiveSong.src) {
                     // For local uploads
@@ -370,7 +403,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         try {
             if (isLoginMode) {
-                // LOGIN MODE: Only check Email and Password
+                // LOGIN MODE: Fetch fresh data first to check approvals instantly
+                await fetchUsersFromBackend();
+                
+                // Only check Email and Password
                 const foundUser = usersDB.find(u => u.email === email);
                 if (foundUser) {
                     if (foundUser.status === 'pending') {
@@ -448,7 +484,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function syncUserToBackend(user) {
         try {
-            await fetch('https://f467d44a9f34ac.lhr.life/api/sync-user', {
+            await fetch(`${BACKEND_URL}/api/sync-user`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

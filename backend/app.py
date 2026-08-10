@@ -68,6 +68,19 @@ def sync_user():
         print(f"Database Error: {e}")
         return jsonify({"error": "Database error"}), 500
 
+@app.route('/api/users', methods=['GET'])
+def get_users():
+    try:
+        conn = sqlite3.connect('database.db')
+        c = conn.cursor()
+        c.execute("SELECT id, email, username, password, status FROM users")
+        users = [{'id': row[0], 'email': row[1], 'username': row[2], 'password': row[3], 'status': row[4]} for row in c.fetchall()]
+        conn.close()
+        return jsonify({"users": users})
+    except Exception as e:
+        print(f"Database Error: {e}")
+        return jsonify({"error": "Database error"}), 500
+
 
 @app.route('/search', methods=['GET'])
 def search():
