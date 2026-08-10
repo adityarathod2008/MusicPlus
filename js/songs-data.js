@@ -9,7 +9,7 @@ async function loadTrendingSongs() {
         // Fetch trending/top tracks from our local Python backend
         const response = await fetch(`${BACKEND_URL}/search?q=top+hindi+hits`);
         const data = await response.json();
-        
+
         if (data && data.results) {
             songs = data.results.map(formatYouTubeTrack);
             return songs;
@@ -20,9 +20,9 @@ async function loadTrendingSongs() {
         // Fallback to a few open source tracks if backend isn't running
         songs = [
             {
-                id: "s1", title: "Backend Not Running", artist: "System", album: "Error", 
-                cover: "https://via.placeholder.com/300?text=Start+Backend", 
-                src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", 
+                id: "s1", title: "Backend Not Running", artist: "System", album: "Error",
+                cover: "https://via.placeholder.com/300?text=Start+Backend",
+                src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
                 duration: "06:12", genre: "Electronic"
             }
         ];
@@ -56,7 +56,7 @@ async function searchAudiusTracks(query) {
         // Use our local Python backend for search
         const response = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(query)}`);
         const data = await response.json();
-        
+
         if (data && data.results) {
             return data.results.map(formatYouTubeTrack);
         }
