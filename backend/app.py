@@ -9,12 +9,15 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes so the frontend can hit this API
 
+# Use /tmp for sqlite on Vercel since the main filesystem is read-only
+DB_PATH = '/tmp/database.db' if os.environ.get('VERCEL') == '1' else 'database.db'
+
 # Temporary store for OTPs: { email: { 'otp': '123456', 'expires': timestamp } }
 otp_store = {}
 
 # Initialize SQLite Database
 def init_db():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -45,7 +48,7 @@ def sync_user():
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     try:
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         
         # Check if user exists
@@ -71,7 +74,7 @@ def sync_user():
 @app.route('/api/users', methods=['GET'])
 def get_users():
     try:
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT id, email, username, password, status FROM users")
         users = [{'id': row[0], 'email': row[1], 'username': row[2], 'password': row[3], 'status': row[4]} for row in c.fetchall()]

@@ -2,7 +2,9 @@ let songs = [];
 const genres = ["All", "Electronic", "Hip-Hop", "Pop", "Lo-Fi", "Rock"];
 const playlists = [];
 
-const BACKEND_URL = 'http://127.0.0.1:5000';
+const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://127.0.0.1:5000' 
+    : '';
 
 async function loadTrendingSongs() {
     try {
