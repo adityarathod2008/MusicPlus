@@ -4,7 +4,7 @@ const playlists = [];
 
 const BACKEND_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') 
     ? 'http://127.0.0.1:5000' 
-    : 'https://5c529603aab9bc.lhr.life';
+    : 'https://james-injuries-act-lil.trycloudflare.com';
 
 async function loadTrendingSongs() {
     try {
