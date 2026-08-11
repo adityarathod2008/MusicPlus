@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
+    const APP_VERSION = '1.0.1';
+
     // Initialize components
     const audioPlayer = new AudioPlayer();
     const visualizer = new AudioVisualizer(audioPlayer.audio);
@@ -97,6 +99,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     let searchHistory = JSON.parse(localStorage.getItem('searchHistory')) || [];
     
+    // Version check for old users
+    const savedVersion = localStorage.getItem('app_version');
+    if (savedVersion !== null && savedVersion !== APP_VERSION) {
+        document.getElementById('update-modal').style.display = 'flex';
+    }
+    localStorage.setItem('app_version', APP_VERSION);
+    
+    document.getElementById('close-update-btn')?.addEventListener('click', () => {
+        document.getElementById('update-modal').style.display = 'none';
+    });
+    
     await initData();
     initUI();
     
@@ -167,9 +180,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const lyricsEl = document.getElementById('lyrics-content');
                 if (lyricsEl) lyricsEl.innerHTML = '<p class="active-lyric">Searching for lyrics...</p>';
                 
-                const response = await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(song.artist)}&track_name=${encodeURIComponent(song.title)}`);
+                let cleanTitle = song.title.replace(/\s*\|.*$/g, '').replace(/\s*\([^)]*\)/g, '').replace(/\s*\[[^\]]*\]/g, '').replace(/(official|video|audio|lyric|lyrics|full song)/gi, '').trim();
+                const query = encodeURIComponent(`${cleanTitle} ${song.artist}`);
+                const response = await fetch(`https://lrclib.net/api/search?q=${query}`);
+                
                 if (response.ok) {
-                    const data = await response.json();
+                    const dataList = await response.json();
+                    const data = (dataList && dataList.length > 0) ? dataList[0] : null;
                     if (data && data.syncedLyrics) {
                         const parsedLyrics = parseLRC(data.syncedLyrics);
                         lyricsSync.loadLyrics(parsedLyrics);
@@ -653,7 +670,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <h4>${song.title}</h4>
                 <button class="quick-play-btn"><i class="fas fa-play"></i></button>
             `;
-            card.addEventListener('click', () => { audioPlayer.queue = songs; audioPlayer.playSong(song, i); });
+            card.addEventListener('click', () => { 
+                audioPlayer.queue = [song]; 
+                audioPlayer.playSong(song, 0); 
+                audioPlayer.bufferUpcomingSongs(); 
+            });
             quickGrid.appendChild(card);
         });
         
@@ -692,241 +713,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             <h4>${song.title}</h4>
             <p>${song.artist}</p>
         `;
-        card.addEventListener('click', () => { audioPlayer.queue = queueArray; audioPlayer.playSong(song, index); });
-        return card;
-    }
-    
-    function populateGenres() {
-        const grid = document.getElementById('genre-grid');
-        if (!grid) return;
-        grid.innerHTML = '';
-        
-        // Let's add some popular search terms since genres are limited
-        const searchTerms = ["Electronic", "Hip-Hop", "Pop", "Lo-Fi", "Rock", "Bollywood", "Punjabi", "Workout", "Chill", "Romantic", "Party", "Acoustic"];
-        
-        searchTerms.forEach(term => {
-            const card = document.createElement('div');
-            card.className = 'music-card';
-            card.style.backgroundColor = `hsl(${Math.random() * 360}, 70%, 25%)`;
-            card.style.height = '120px';
-            card.style.display = 'flex';
-            card.style.alignItems = 'center';
-            card.style.justifyContent = 'center';
-            card.style.overflow = 'hidden';
-            
-            card.innerHTML = `<h3 style="font-size: 20px; font-weight: 700; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">${term}</h3>`;
-            
-            card.addEventListener('click', () => {
-                const searchInput = document.getElementById('search-input');
-                searchInput.value = term;
-                searchInput.dispatchEvent(new Event('input'));
-                
-                // Trigger the enter keydown event to save it to history
-                searchInput.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
-            });
-            
-            grid.appendChild(card);
-        });
-    }
-    
-    function openDrawer(type) {
-        app.classList.add('drawer-open');
-        
-        // Hide all
-        lyricsDrawer.style.display = 'none';
-        queueDrawer.style.display = 'none';
-        nowPlayingDrawer.style.display = 'none';
-        
-        visualizerBtn.classList.remove('active');
-        lyricsBtn.classList.remove('active');
-        queueBtn.classList.remove('active');
-        
-        if (type === 'viz') {
-            nowPlayingDrawer.style.display = 'block';
-            vizDrawer.style.display = 'block';
-            drawerTitle.textContent = 'Now Playing';
-            visualizerBtn.classList.add('active');
-            visualizer.init(); 
-        } else if (type === 'lyrics') {
-            nowPlayingDrawer.style.display = 'block';
-            vizDrawer.style.display = 'none';
-            lyricsDrawer.style.display = 'block';
-            drawerTitle.textContent = 'Lyrics';
-            lyricsBtn.classList.add('active');
-        } else if (type === 'queue') {
-            queueDrawer.style.display = 'block';
-            drawerTitle.textContent = 'Queue';
-            queueBtn.classList.add('active');
-            renderQueue();
-        }
-    }
-    
-    function renderQueue() {
-        const qList = document.getElementById('queue-list');
-        qList.innerHTML = '';
-        
-        let draggedIndex = null;
-        
-        audioPlayer.queue.forEach((song, i) => {
-            const item = document.createElement('div');
-            item.className = 'queue-item';
-            item.draggable = true;
-            item.style.display = 'flex';
-            item.style.alignItems = 'center';
-            item.style.gap = '12px';
-            item.style.padding = '8px';
-            item.style.borderRadius = '4px';
-            
-            const isPlaying = (i === audioPlayer.currentSongIndex);
-            if (isPlaying) item.style.color = 'var(--accent-color)';
-            
-            item.innerHTML = `
-                <i class="fas fa-grip-vertical queue-item-drag-handle"></i>
-                <img src="${song.cover}" style="width: 40px; height: 40px; border-radius: 4px; pointer-events: none; flex-shrink: 0;">
-                <div style="flex-grow: 1; pointer-events: none; overflow: hidden; min-width: 0;">
-                    <div style="font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.title}</div>
-                    <div style="font-size: 12px; color: var(--text-subdued); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.artist}</div>
-                </div>
-            `;
-            
-            // Delete button (don't allow deleting the currently playing song to avoid logic bugs)
-            if (!isPlaying) {
-                const delBtn = document.createElement('button');
-                delBtn.innerHTML = '<i class="fas fa-times"></i>';
-                delBtn.style.background = 'none';
-                delBtn.style.border = 'none';
-                delBtn.style.color = 'var(--text-subdued)';
-                delBtn.style.cursor = 'pointer';
-                delBtn.style.padding = '4px';
-                delBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    audioPlayer.queue.splice(i, 1);
-                    if (audioPlayer.currentSongIndex > i) {
-                        audioPlayer.currentSongIndex--;
-                    }
-                    
-                    // Buffer if we dropped below 10
-                    if (audioPlayer.queue.length - audioPlayer.currentSongIndex <= 10) {
-                        audioPlayer.bufferUpcomingSongs();
-                    }
-                    
-                    audioPlayer.saveSession();
-                    renderQueue();
-                };
-                item.appendChild(delBtn);
-            }
-            
-            // Drag Events
-            item.addEventListener('dragstart', (e) => {
-                draggedIndex = i;
-                item.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-            });
-            
-            item.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                item.classList.add('drag-over');
-            });
-            
-            item.addEventListener('dragleave', () => {
-                item.classList.remove('drag-over');
-            });
-            
-            item.addEventListener('drop', (e) => {
-                e.preventDefault();
-                item.classList.remove('drag-over');
-                if (draggedIndex === null || draggedIndex === i) return;
-                
-                // Reorder array
-                const draggedSong = audioPlayer.queue.splice(draggedIndex, 1)[0];
-                audioPlayer.queue.splice(i, 0, draggedSong);
-                
-                // Update currentSongIndex if it was affected
-                if (audioPlayer.currentSongIndex === draggedIndex) {
-                    audioPlayer.currentSongIndex = i;
-                } else if (draggedIndex < audioPlayer.currentSongIndex && i >= audioPlayer.currentSongIndex) {
-                    audioPlayer.currentSongIndex--;
-                } else if (draggedIndex > audioPlayer.currentSongIndex && i <= audioPlayer.currentSongIndex) {
-                    audioPlayer.currentSongIndex++;
-                }
-                
-                audioPlayer.saveSession();
-                renderQueue();
-            });
-            
-            item.addEventListener('dragend', () => {
-                item.classList.remove('dragging');
-                draggedIndex = null;
-            });
-            
-            // Play song on double click or when clicking the text area
-            item.addEventListener('dblclick', () => audioPlayer.playSong(song, i));
-            
-            qList.appendChild(item);
-        });
-    }
-    
-    function switchView(viewId) {
-        views.forEach(v => v.classList.remove('active-view'));
-        
-        if (viewId === 'search') {
-            document.getElementById('search-view').classList.add('active-view');
-            searchContainer.style.display = 'block';
-            searchInput.focus();
-        } else {
-            searchContainer.style.display = 'none';
-            if (viewId === 'home') {
-                document.getElementById('home-view').classList.add('active-view');
-            } else if (viewId === 'library') {
-                document.getElementById('library-view').classList.add('active-view');
-                renderLikedSongs();
-            } else if (viewId === 'downloads') {
-                document.getElementById('downloads-view').classList.add('active-view');
-                renderDownloads();
-            } else if (viewId === 'users-admin') {
-                document.getElementById('users-admin-view').classList.add('active-view');
-            }
-        }
-    }
-    
-    async function handleLiveSearch(query) {
-        currentSearchResults = await searchAudiusTracks(query);
-        
-        searchResultsList.innerHTML = '';
-        if (currentSearchResults.length === 0) {
-            searchResultsList.innerHTML = '<p>No results found</p>';
-            return;
-        }
-        
-        currentSearchResults.forEach((song, idx) => {
-            const item = document.createElement('div');
-            item.style.display = 'flex';
-            item.style.alignItems = 'center';
-            item.style.gap = '16px';
-            item.style.padding = '8px';
-            item.style.borderRadius = '4px';
-            item.style.cursor = 'pointer';
-            item.onmouseover = () => item.style.backgroundColor = 'var(--bg-color-elevated)';
-            item.onmouseout = () => item.style.backgroundColor = 'transparent';
-            
-            item.innerHTML = `
-                <img src="${song.cover}" style="width: 48px; height: 48px; border-radius: 4px;">
-                <div style="flex-grow: 1;">
-                    <div style="font-weight: 600;">${song.title}</div>
-                    <div style="font-size: 14px; color: var(--text-subdued);">${song.artist}</div>
-                </div>
-            `;
-            item.addEventListener('click', () => {
-                // Play clicked song, then queue the global songs (excluding the clicked one) to provide variety
-                audioPlayer.queue = [song, ...songs.filter(s => s.id !== song.id)];
-                audioPlayer.playSong(song, 0);
-                audioPlayer.saveSession();
-            });
-            searchResultsList.appendChild(item);
-        });
-    }
-    
+        card.addEventListener('click', () => { 
+            audioPlayer.queue = [song]; 
+            audioPlayer.playSong(song, 0); 
+            audioPlayer.bufferUpcomingSongs(); 
     function toggleLike() {
         if (!currentActiveSong) return;
         

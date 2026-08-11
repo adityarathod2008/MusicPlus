@@ -160,7 +160,6 @@ def download(video_id):
                 safe_title = "song"
             filename = f"{safe_title}.webm"
             resp_headers.append(('Content-Disposition', f'attachment; filename="{filename}"'))
-            resp_headers.append(('Access-Control-Allow-Origin', '*'))
             
             return Response(req.iter_content(chunk_size=1024*1024), 
                             status=req.status_code, 
@@ -200,9 +199,6 @@ def stream(video_id):
             excluded_headers = ['content-encoding', 'transfer-encoding', 'connection']
             resp_headers = [(name, value) for (name, value) in req.headers.items()
                             if name.lower() not in excluded_headers]
-                            
-            # Add CORS headers specifically for the stream so the visualizer works
-            resp_headers.append(('Access-Control-Allow-Origin', '*'))
             
             return Response(req.iter_content(chunk_size=1024*1024), 
                             status=req.status_code, 

@@ -208,24 +208,15 @@ class AudioPlayer {
         this.isBufferingQueue = true;
         
         try {
-            // Recommendation Engine based on Preferences
-            let searchQuery = "";
-            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-            
-            // 50% chance to use user's play history/liked songs, 50% chance to use last played song
-            if (currentUser && Math.random() > 0.5 && (currentUser.playHistory?.length > 0 || currentUser.likedSongs?.length > 0)) {
-                // Pick a random song from their history or likes to base the vibe on
-                const combinedPrefs = [...(currentUser.playHistory || []), ...(currentUser.likedSongs || [])];
-                const randomPref = combinedPrefs[Math.floor(Math.random() * combinedPrefs.length)];
-                searchQuery = randomPref.artist + " song";
+            // Always try to maintain the vibe of the last played song
+            const lastSong = this.queue[this.queue.length - 1] || this.queue[this.currentSongIndex];
+            if (lastSong) {
+                // The 'artist' field from yt-dlp is often just the uploader channel (e.g. '7clouds').
+                // Using the cleaned title yields much better 'vibe' recommendations from YouTube.
+                let cleanTitle = lastSong.title.replace(/\s*\|.*$/g, '').replace(/\s*\([^)]*\)/g, '').replace(/\s*\[[^\]]*\]/g, '').replace(/(official|video|audio|lyric|lyrics|full song)/gi, '').trim();
+                searchQuery = "songs like " + cleanTitle;
             } else {
-                // Fallback to the current/last song's artist
-                const lastSong = this.queue[this.queue.length - 1] || this.queue[this.currentSongIndex];
-                if (lastSong) {
-                    searchQuery = lastSong.artist + " song";
-                } else {
-                    searchQuery = "trending music";
-                }
+                searchQuery = "trending music";
             }
             
             const response = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(searchQuery)}`);
