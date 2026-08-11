@@ -54,4 +54,4 @@ if __name__ == '__main__':
     webview.create_window('Music+', url=url, width=1280, height=800, background_color='#121212')
     
     # Start the GUI event loop
-    webview.start()
+    webview.start(private_mode=False)
