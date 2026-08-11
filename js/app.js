@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const updateModal = document.getElementById('update-modal');
             if (updateModal) {
                 updateModal.style.display = 'flex';
-                document.getElementById('update-btn').onclick = () => {
+                document.getElementById('close-update-btn').onclick = () => {
                     localStorage.setItem('app_version', app_version);
                     updateModal.style.display = 'none';
                 };

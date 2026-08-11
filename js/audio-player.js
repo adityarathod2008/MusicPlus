@@ -208,6 +208,7 @@ class AudioPlayer {
         this.isBufferingQueue = true;
         
         try {
+            let searchQuery;
             // Always try to maintain the vibe of the last played song
             const lastSong = this.queue[this.queue.length - 1] || this.queue[this.currentSongIndex];
             if (lastSong) {
