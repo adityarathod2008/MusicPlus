@@ -1,0 +1,3 @@
+@echo off
+echo Starting Music+...
+python desktop_app.py

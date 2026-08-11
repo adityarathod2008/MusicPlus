@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from flask import Flask, request, jsonify, redirect, Response
 from flask_cors import CORS
 import yt_dlp
@@ -9,8 +10,13 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes so the frontend can hit this API
 
-# Use /tmp for sqlite on Vercel since the main filesystem is read-only
-DB_PATH = '/tmp/database.db' if os.environ.get('VERCEL') == '1' else 'database.db'
+# Use /tmp for sqlite on Vercel, otherwise save to user's home directory to avoid dropping files randomly
+if os.environ.get('VERCEL') == '1':
+    DB_PATH = '/tmp/database.db'
+else:
+    app_dir = Path.home() / '.musicplus'
+    app_dir.mkdir(parents=True, exist_ok=True)
+    DB_PATH = str(app_dir / 'database.db')
 
 # Temporary store for OTPs: { email: { 'otp': '123456', 'expires': timestamp } }
 otp_store = {}
