@@ -43,8 +43,8 @@ if __name__ == '__main__':
     # Give the backend a second to start
     time.sleep(1)
 
-    # Get the absolute path to index.html
-    html_file = os.path.join(base_path, 'index.html')
+    # Get the absolute path to music_app.html
+    html_file = os.path.join(base_path, 'music_app.html')
     # Formatting for file URL
     url = f'file:///{html_file.replace(os.sep, "/")}'
     
