@@ -212,12 +212,15 @@ class AudioPlayer {
             // Always try to maintain the vibe of the last played song
             const lastSong = this.queue[this.queue.length - 1] || this.queue[this.currentSongIndex];
             if (lastSong) {
-                // The 'artist' field from yt-dlp is often just the uploader channel (e.g. '7clouds').
-                // Using the cleaned title yields much better 'vibe' recommendations from YouTube.
                 let cleanTitle = lastSong.title.replace(/\s*\|.*$/g, '').replace(/\s*\([^)]*\)/g, '').replace(/\s*\[[^\]]*\]/g, '').replace(/(official|video|audio|lyric|lyrics|full song)/gi, '').trim();
-                searchQuery = "songs like " + cleanTitle;
+                let artistOrTitle = cleanTitle.split('-')[0].trim();
+                searchQuery = artistOrTitle + " top hits";
+                
+                // Keep track of the current song's actual name to filter out remixes/lyrics versions
+                var currentSongName = cleanTitle.split('-').pop().trim().toLowerCase();
             } else {
                 searchQuery = "trending music";
+                var currentSongName = "";
             }
             
             const response = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(searchQuery)}`);
@@ -225,7 +228,12 @@ class AudioPlayer {
             
             if (data.results && data.results.length > 0) {
                 const existingIds = new Set(this.queue.map(s => s.id));
-                const newSongs = data.results.filter(s => !existingIds.has(s.id));
+                const newSongs = data.results.filter(s => {
+                    if (existingIds.has(s.id)) return false;
+                    // Filter out variations of the exact same song
+                    if (currentSongName && currentSongName.length > 3 && s.title.toLowerCase().includes(currentSongName)) return false;
+                    return true;
+                });
                 
                 // Add up to 10 new songs to the queue buffer
                 const songsToAdd = newSongs.slice(0, 10);
