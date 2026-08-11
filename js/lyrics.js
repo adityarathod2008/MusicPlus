@@ -25,7 +25,7 @@ class LyricsSync {
         this.container.innerHTML = '';
         
         if (this.currentLyrics.length === 0) {
-            this.container.innerHTML = '<p class="active-lyric">No lyrics available for this track.</p>';
+            this.container.innerHTML = '<p class="active-lyric">No lyrics available for this song.</p>';
             return;
         }
 

@@ -156,11 +156,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         checkAuthState();
         
         // Listen to song changes from player
-        audioPlayer.onSongChange((song) => {
+        audioPlayer.onSongChange(async (song) => {
             currentActiveSong = song;
-            lyricsSync.loadLyrics(song.lyrics);
             updateLikeButtonsState();
             visualizer.init(); // Init audio context on first play
+            
+            // Fetch lyrics from LRCLIB
+            lyricsSync.loadLyrics([]); // Clear old lyrics
+            try {
+                const lyricsEl = document.getElementById('lyrics-content');
+                if (lyricsEl) lyricsEl.innerHTML = '<p class="active-lyric">Searching for lyrics...</p>';
+                
+                const response = await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(song.artist)}&track_name=${encodeURIComponent(song.title)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.syncedLyrics) {
+                        const parsedLyrics = parseLRC(data.syncedLyrics);
+                        lyricsSync.loadLyrics(parsedLyrics);
+                        song.lyrics = parsedLyrics; // cache it
+                    } else if (data && data.plainLyrics) {
+                        // fallback to plain lyrics if synced isn't available
+                        document.getElementById('lyrics-content').innerHTML = `<p style="white-space: pre-wrap; text-align: center; color: var(--text-base); padding: 20px; line-height: 2;">${data.plainLyrics}</p>`;
+                    } else {
+                        lyricsSync.loadLyrics([]);
+                    }
+                } else {
+                    lyricsSync.loadLyrics([]);
+                }
+            } catch (err) {
+                console.error("Lyrics fetch error:", err);
+                lyricsSync.loadLyrics([]);
+            }
+
+            // Check if downloaded to update icon color
+            const downloadBtn = document.getElementById('download-btn');
+            if (downloadBtn) {
+                const isSaved = await musicDB.getDownload(song.id);
+                if (isSaved) {
+                    downloadBtn.style.color = 'var(--accent-color)';
+                } else {
+                    downloadBtn.style.color = 'var(--text-subdued)';
+                }
+            }
             
             // Add to Play History for Recommendations
             if (currentUser) {
@@ -194,6 +231,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (downloadBtn) {
             downloadBtn.addEventListener('click', async () => {
                 if (currentActiveSong && currentActiveSong.id) {
+                    // Check if already downloaded
+                    const existing = await musicDB.getDownload(currentActiveSong.id);
+                    if (existing) {
+                        // Ask to remove
+                        if (confirm("This song is already downloaded. Remove from downloads?")) {
+                            await musicDB.deleteDownload(currentActiveSong.id);
+                            downloadBtn.style.color = 'var(--text-subdued)';
+                            if (document.getElementById('downloads-view').classList.contains('active-view')) {
+                                renderDownloads();
+                            }
+                        }
+                        return;
+                    }
+                    
                     const downloadUrl = `${BACKEND_URL}/download/${currentActiveSong.id}`;
                     
                     // Show loading state
@@ -204,34 +255,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const response = await fetch(downloadUrl);
                         if (!response.ok) throw new Error("Download failed");
                         const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
                         
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = url;
-                        a.download = (currentActiveSong.title || 'song') + '.m4a';
-                        document.body.appendChild(a);
-                        a.click();
+                        await musicDB.saveSong(currentActiveSong, blob);
+                        downloadBtn.style.color = 'var(--accent-color)';
                         
-                        setTimeout(() => {
-                            document.body.removeChild(a);
-                            window.URL.revokeObjectURL(url);
-                        }, 100);
+                        // Show toast/alert
+                        const oldContent = downloadBtn.innerHTML;
+                        downloadBtn.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => downloadBtn.innerHTML = originalIcon, 2000);
+                        
+                        if (document.getElementById('downloads-view').classList.contains('active-view')) {
+                            renderDownloads();
+                        }
                     } catch (e) {
                         console.error("Download error:", e);
-                        alert("Failed to download song.");
-                    } finally {
+                        alert("Failed to save song offline.");
                         downloadBtn.innerHTML = originalIcon;
                     }
-                } else if (currentActiveSong && currentActiveSong.src) {
-                    // For local uploads
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = currentActiveSong.src;
-                    a.download = currentActiveSong.title + '.mp3';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
                 }
             });
         }
@@ -841,6 +881,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else if (viewId === 'library') {
                 document.getElementById('library-view').classList.add('active-view');
                 renderLikedSongs();
+            } else if (viewId === 'downloads') {
+                document.getElementById('downloads-view').classList.add('active-view');
+                renderDownloads();
             } else if (viewId === 'users-admin') {
                 document.getElementById('users-admin-view').classList.add('active-view');
             }
@@ -1196,4 +1239,138 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
     window.renderSearchHistory = renderSearchHistory; // expose
+    
+    async function renderDownloads() {
+        const listContainer = document.getElementById('downloads-list');
+        const playAllContainer = document.getElementById('downloads-play-all-container');
+        listContainer.innerHTML = '';
+        
+        try {
+            const downloadedSongs = await musicDB.getAllDownloads();
+            
+            if (!downloadedSongs || downloadedSongs.length === 0) {
+                playAllContainer.style.display = 'none';
+                listContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-subdued);">
+                        <i class="fas fa-download" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                        <h3>No downloads yet</h3>
+                        <p style="margin-top: 8px;">Songs you download will appear here for offline listening.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            playAllContainer.style.display = 'block';
+            
+            // Map the downloaded objects back into playable song objects
+            const offlineQueue = downloadedSongs.map(item => {
+                // We need to create a temporary URL for the Blob so AudioPlayer can play it
+                let src = item.src;
+                if (item.blob) {
+                    src = window.URL.createObjectURL(item.blob);
+                }
+                
+                return {
+                    id: item.id,
+                    title: item.title,
+                    artist: item.artist,
+                    cover: item.cover,
+                    src: src,
+                    lyrics: [],
+                    isOffline: true
+                };
+            });
+            
+            offlineQueue.forEach((song, index) => {
+                const row = document.createElement('div');
+                row.className = 'song-row';
+                
+                row.innerHTML = `
+                    <div class="song-col song-index">
+                        <span class="index-num">${index + 1}</span>
+                        <i class="fas fa-play play-icon"></i>
+                    </div>
+                    <div class="song-col song-title">
+                        <img src="${song.cover}" alt="cover" loading="lazy">
+                        <div>
+                            <div class="title-text">${song.title}</div>
+                        </div>
+                    </div>
+                    <div class="song-col song-album">${song.artist}</div>
+                    <div class="song-col song-duration" style="justify-content: flex-end;">
+                        <button class="remove-download-btn" data-id="${song.id}" style="background: none; border: none; color: var(--text-subdued); cursor: pointer; padding: 8px;" title="Remove Download"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                
+                row.addEventListener('click', (e) => {
+                    if(e.target.closest('.remove-download-btn')) return;
+                    audioPlayer.queue = offlineQueue;
+                    audioPlayer.playSong(song, index);
+                });
+                
+                listContainer.appendChild(row);
+            });
+            
+            // Add remove listener
+            document.querySelectorAll('.remove-download-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const id = e.currentTarget.getAttribute('data-id');
+                    if (confirm("Remove this song from downloads?")) {
+                        await musicDB.deleteDownload(id);
+                        renderDownloads(); // refresh
+                        
+                        // Update download btn if playing
+                        if (currentActiveSong && currentActiveSong.id === id) {
+                            const dBtn = document.getElementById('download-btn');
+                            if (dBtn) dBtn.style.color = 'var(--text-subdued)';
+                        }
+                    }
+                });
+            });
+            
+            // Play all logic
+            const playAllBtn = document.getElementById('play-downloads-btn');
+            if(playAllBtn) {
+                // Remove old listeners to prevent stacking
+                const newBtn = playAllBtn.cloneNode(true);
+                playAllBtn.parentNode.replaceChild(newBtn, playAllBtn);
+                newBtn.addEventListener('click', () => {
+                    audioPlayer.queue = offlineQueue;
+                    audioPlayer.playSong(offlineQueue[0], 0);
+                });
+            }
+            
+        } catch (err) {
+            console.error("Failed to load downloads", err);
+            listContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--error);">Failed to load downloads</div>';
+        }
+    }
+
+    function parseLRC(lrcText) {
+        const lines = lrcText.split('\\n');
+        const lyrics = [];
+        const timeRegEx = /\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})\\]/;
+        
+        lines.forEach(line => {
+            const match = timeRegEx.exec(line);
+            if (match) {
+                const min = parseInt(match[1]);
+                const sec = parseInt(match[2]);
+                const ms = parseInt(match[3]);
+                
+                // Convert ms based on whether it's 2 or 3 digits
+                const msMultiplier = match[3].length === 2 ? 10 : 1;
+                
+                const timeInSeconds = (min * 60) + sec + ((ms * msMultiplier) / 1000);
+                const text = line.replace(timeRegEx, '').trim();
+                
+                if (text) {
+                    lyrics.push({ time: timeInSeconds, text });
+                }
+            }
+        });
+        
+        return lyrics;
+    }
 });

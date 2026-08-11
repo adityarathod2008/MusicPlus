@@ -25,6 +25,7 @@
                 <li class="active" data-view="home"><i class="fas fa-home"></i> <span>Home</span></li>
                 <li data-view="search"><i class="fas fa-search"></i> <span>Search</span></li>
                 <li data-view="library"><i class="fas fa-book-open"></i> <span>Your Library</span></li>
+                <li data-view="downloads"><i class="fas fa-download"></i> <span>Downloads</span></li>
                 <li data-view="users-admin" id="admin-nav" style="display: none;"><i class="fas fa-users"></i>
                     <span>Users DB</span></li>
             </ul>
@@ -134,6 +135,29 @@
                         </div>
                         <div id="liked-songs-list">
                             <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Downloads View -->
+                <div class="view-container" id="downloads-view">
+                    <h2 class="section-title">Offline Downloads</h2>
+                    <p style="color: var(--text-subdued); margin-bottom: 20px;">Listen to these songs anytime, even without an internet connection.</p>
+                    <div class="library-header" id="downloads-play-all-container" style="display: none;">
+                        <div class="play-btn-large" id="play-downloads-btn"><i class="fas fa-play"></i></div>
+                    </div>
+                    <div class="songs-list-container">
+                        <div class="list-header">
+                            <span>#</span>
+                            <span>Title</span>
+                            <span>Artist</span>
+                            <span><i class="far fa-clock"></i></span>
+                        </div>
+                        <div id="downloads-list">
+                            <!-- Populated by JS -->
+                            <div style="text-align: center; padding: 40px; color: var(--text-subdued);">
+                                You haven't downloaded any songs yet.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -339,6 +363,7 @@
     <audio id="main-audio" crossorigin="anonymous"></audio>
 
     <script src="js/songs-data.js?v=17"></script>
+    <script src="js/db.js?v=17"></script>
     <script src="js/visualizer.js?v=17"></script>
     <script src="js/lyrics.js?v=17"></script>
     <script src="js/audio-player.js?v=17"></script>
