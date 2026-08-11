@@ -23,7 +23,7 @@ async function loadTrendingSongs() {
         songs = [
             {
                 id: "s1", title: "Backend Not Running", artist: "System", album: "Error",
-                cover: "https://via.placeholder.com/300?text=Start+Backend",
+                cover: "https://placehold.co/300x300/121212/1DB954?text=Music+",
                 src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
                 duration: "06:12", genre: "Electronic"
             }
@@ -38,7 +38,7 @@ function formatYouTubeTrack(track) {
         title: track.title || 'Unknown Title',
         artist: track.artist || 'Unknown Artist',
         album: 'YouTube Music',
-        cover: track.cover || 'https://via.placeholder.com/300',
+        cover: track.cover || 'https://placehold.co/300x300/121212/1DB954?text=Music+',
         src: `${BACKEND_URL}/stream/${track.id}`,
         duration: formatSeconds(track.duration || 180),
         genre: 'Music',

@@ -192,10 +192,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Download Button
         const downloadBtn = document.getElementById('download-btn');
         if (downloadBtn) {
-            downloadBtn.addEventListener('click', () => {
+            downloadBtn.addEventListener('click', async () => {
                 if (currentActiveSong && currentActiveSong.id) {
                     const downloadUrl = `${BACKEND_URL}/download/${currentActiveSong.id}`;
-                    window.open(downloadUrl, '_blank');
+                    
+                    // Show loading state
+                    const originalIcon = downloadBtn.innerHTML;
+                    downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    
+                    try {
+                        const response = await fetch(downloadUrl);
+                        if (!response.ok) throw new Error("Download failed");
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = (currentActiveSong.title || 'song') + '.m4a';
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                        }, 100);
+                    } catch (e) {
+                        console.error("Download error:", e);
+                        alert("Failed to download song.");
+                    } finally {
+                        downloadBtn.innerHTML = originalIcon;
+                    }
                 } else if (currentActiveSong && currentActiveSong.src) {
                     // For local uploads
                     const a = document.createElement('a');
@@ -503,6 +530,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentUser = null;
         likedSongs = [];
         localStorage.removeItem('currentUser');
+        localStorage.removeItem('musicplus_session'); // Clear queue and current song for next user
         checkAuthState();
         switchView('home');
         // Reset active nav
@@ -596,10 +624,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         
         // Recently Played
-        songs.slice(12, 18).forEach((song, i) => {
-            const card = createMusicCard(song, i + 12, songs);
-            recentlyPlayed.appendChild(card);
-        });
+        recentlyPlayed.innerHTML = '';
+        if (currentUser && currentUser.playHistory && currentUser.playHistory.length > 0) {
+            // Show last 6 played songs (reversed so most recent is first)
+            const recent = [...currentUser.playHistory].reverse().slice(0, 6);
+            recent.forEach((song, i) => {
+                const card = createMusicCard(song, i, recent);
+                recentlyPlayed.appendChild(card);
+            });
+        } else {
+            // Fallback to random songs if no history
+            songs.slice(12, 18).forEach((song, i) => {
+                const card = createMusicCard(song, i + 12, songs);
+                recentlyPlayed.appendChild(card);
+            });
+        }
     }
     
     function createMusicCard(song, index, queueArray) {
