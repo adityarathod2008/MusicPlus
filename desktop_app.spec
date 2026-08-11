@@ -5,7 +5,7 @@ a = Analysis(
     ['desktop_app.py'],
     pathex=[],
     binaries=[],
-    datas=[('backend', 'backend'), ('js', 'js'), ('index.html', '.'), ('style.css', '.')],
+    datas=[('backend', 'backend'), ('js', 'js'), ('music_app.html', '.'), ('style.css', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

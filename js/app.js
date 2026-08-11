@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const app = document.getElementById('app');
     const visualizerBtn = document.getElementById('visualizer-btn');
     const lyricsBtn = document.getElementById('lyrics-btn');
+    const queueBtn = document.getElementById('queue-btn');
     const closeDrawerBtn = document.getElementById('close-drawer');
     const drawerTitle = document.getElementById('drawer-view-title');
     
@@ -235,6 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Drawer toggles
         visualizerBtn.addEventListener('click', () => openDrawer('viz'));
         lyricsBtn.addEventListener('click', () => openDrawer('lyrics'));
+        queueBtn.addEventListener('click', () => openDrawer('queue'));
         closeDrawerBtn.addEventListener('click', () => app.classList.remove('drawer-open'));
         
         // Download Button
