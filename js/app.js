@@ -667,6 +667,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <button class="quick-play-btn"><i class="fas fa-play"></i></button>
             `;
             card.addEventListener('click', () => { 
+                if (!song.src) song.src = `${BACKEND_URL}/stream/${song.id}`;
                 audioPlayer.queue = [song]; 
                 audioPlayer.playSong(song, 0); 
                 audioPlayer.bufferUpcomingSongs(); 
@@ -710,6 +711,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <p>${song.artist}</p>
         `;
         card.addEventListener('click', () => { 
+            if (!song.src) song.src = `${BACKEND_URL}/stream/${song.id}`;
             audioPlayer.queue = [song]; 
             audioPlayer.playSong(song, 0); 
             audioPlayer.bufferUpcomingSongs(); 
@@ -939,6 +941,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             `;
             item.addEventListener('click', () => {
+                if (!song.src) song.src = `${BACKEND_URL}/stream/${song.id}`;
                 // Play clicked song, and start a fresh queue based on its vibe
                 audioPlayer.queue = [song];
                 audioPlayer.playSong(song, 0);
