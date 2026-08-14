@@ -277,41 +277,42 @@ def stream(video_id):
         return redirect(url)
 
     # Vercel proxy logic (to avoid 403 IP mismatch)
-            # Get total file size to properly handle chunking
-            head_req = requests.head(url, headers=yt_headers)
-            total_size = int(head_req.headers.get('Content-Length', 0))
+    try:
+        # Get total file size to properly handle chunking
+        head_req = requests.head(url, headers=yt_headers)
+        total_size = int(head_req.headers.get('Content-Length', 0))
+        
+        # Parse requested Range
+        range_header = request.headers.get('Range', 'bytes=0-')
+        byte_range = range_header.replace('bytes=', '').split('-')
+        start = int(byte_range[0]) if byte_range[0] else 0
+        
+        # Force max chunk size of 3MB (safely under Vercel's 4.5MB limit)
+        CHUNK_SIZE = 3 * 1024 * 1024
+        end = int(byte_range[1]) if len(byte_range) > 1 and byte_range[1] else start + CHUNK_SIZE - 1
+        
+        if end - start + 1 > CHUNK_SIZE:
+            end = start + CHUNK_SIZE - 1
             
-            # Parse requested Range
-            range_header = request.headers.get('Range', 'bytes=0-')
-            byte_range = range_header.replace('bytes=', '').split('-')
-            start = int(byte_range[0]) if byte_range[0] else 0
+        if total_size > 0 and end >= total_size:
+            end = total_size - 1
             
-            # Force max chunk size of 3MB (safely under Vercel's 4.5MB limit)
-            CHUNK_SIZE = 3 * 1024 * 1024
-            end = int(byte_range[1]) if len(byte_range) > 1 and byte_range[1] else start + CHUNK_SIZE - 1
-            
-            if end - start + 1 > CHUNK_SIZE:
-                end = start + CHUNK_SIZE - 1
-                
-            if total_size > 0 and end >= total_size:
-                end = total_size - 1
-                
-            yt_headers['Range'] = f"bytes={start}-{end}"
-            
-            req = requests.get(url, headers=yt_headers, stream=True)
-            
-            excluded_headers = ['content-encoding', 'transfer-encoding', 'connection']
-            resp_headers = {name: value for name, value in req.headers.items() if name.lower() not in excluded_headers}
-            
-            resp_headers['Content-Range'] = f"bytes {start}-{end}/{total_size if total_size > 0 else '*'}"
-            resp_headers['Accept-Ranges'] = 'bytes'
-            resp_headers['Content-Length'] = str(end - start + 1)
-            
-            return Response(req.iter_content(chunk_size=1024*1024), 
-                            status=206, 
-                            headers=resp_headers,
-                            content_type=req.headers.get('Content-Type', 'audio/mp4'))
-                            
+        yt_headers['Range'] = f"bytes={start}-{end}"
+        
+        req = requests.get(url, headers=yt_headers, stream=True)
+        
+        excluded_headers = ['content-encoding', 'transfer-encoding', 'connection']
+        resp_headers = {name: value for name, value in req.headers.items() if name.lower() not in excluded_headers}
+        
+        resp_headers['Content-Range'] = f"bytes {start}-{end}/{total_size if total_size > 0 else '*'}"
+        resp_headers['Accept-Ranges'] = 'bytes'
+        resp_headers['Content-Length'] = str(end - start + 1)
+        
+        return Response(req.iter_content(chunk_size=1024*1024), 
+                        status=206, 
+                        headers=resp_headers,
+                        content_type=req.headers.get('Content-Type', 'audio/mp4'))
+                        
     except Exception as e:
         print(f"Stream Error: {e}")
         return jsonify({"error": str(e)}), 500
