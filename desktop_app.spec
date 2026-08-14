@@ -1,11 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_data_files
+
+datas = [('backend', 'backend'), ('js', 'js'), ('music_app.html', '.'), ('style.css', '.')]
+datas += collect_data_files('ytmusicapi')
 
 
 a = Analysis(
     ['desktop_app.py'],
     pathex=[],
     binaries=[],
-    datas=[('backend', 'backend'), ('js', 'js'), ('music_app.html', '.'), ('style.css', '.')],
+    datas=datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
