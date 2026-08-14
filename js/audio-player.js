@@ -62,13 +62,55 @@ class AudioPlayer {
             this.totalTimeEl.textContent = this.formatTime(this.audio.duration);
         });
         
-        // Loading states
+        // Loading states and recovery from stalls
         this.audio.addEventListener('waiting', () => {
             this.playPauseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            if (this.recoveryTimeout) clearTimeout(this.recoveryTimeout);
+            this.recoveryTimeout = setTimeout(() => {
+                if (this.isPlaying && this.audio.readyState < 3) {
+                    console.log("Audio stalled, attempting recovery...");
+                    const currentTime = this.audio.currentTime;
+                    const src = this.audio.src;
+                    this.audio.src = '';
+                    this.audio.load();
+                    this.audio.src = src;
+                    this.audio.currentTime = currentTime;
+                    this.audio.play().catch(e => console.error("Recovery failed", e));
+                }
+            }, 5000); // 5 seconds wait before recovering
         });
+        
         this.audio.addEventListener('playing', () => {
             this.isPlaying = true;
             this.playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            if (this.recoveryTimeout) {
+                clearTimeout(this.recoveryTimeout);
+                this.recoveryTimeout = null;
+            }
+            this.retryCount = 0;
+        });
+        
+        this.audio.addEventListener('pause', () => {
+            if (this.recoveryTimeout) clearTimeout(this.recoveryTimeout);
+        });
+        
+        this.audio.addEventListener('error', (e) => {
+            console.error("Audio error", e);
+            if (this.isPlaying) {
+                const currentSong = this.queue[this.currentSongIndex];
+                if (currentSong && currentSong.src && (!this.retryCount || this.retryCount < 2)) {
+                    this.retryCount = (this.retryCount || 0) + 1;
+                    const currentTime = this.audio.currentTime;
+                    const sep = currentSong.src.includes('?') ? '&' : '?';
+                    this.audio.src = `${currentSong.src}${sep}t=${Date.now()}`;
+                    this.audio.load();
+                    this.audio.currentTime = currentTime;
+                    this.audio.play().catch(err => console.error("Retry failed", err));
+                    return;
+                }
+                this.retryCount = 0;
+                setTimeout(() => this.playNext(), 2000);
+            }
         });
 
         this.progressBarBg.addEventListener('click', (e) => this.seek(e));
@@ -90,13 +132,28 @@ class AudioPlayer {
     
     saveSession() {
         if (!this.queue || this.queue.length === 0) return;
+        
+        // Optimize queue for saving: keep limited context and strip lyrics
+        const startIdx = Math.max(0, this.currentSongIndex - 10);
+        const endIdx = Math.min(this.queue.length, this.currentSongIndex + 20);
+        
+        const optimizedQueue = this.queue.slice(startIdx, endIdx).map(song => {
+            const { lyrics, ...rest } = song; // Remove large lyrics array
+            return rest;
+        });
+
         const sessionData = {
-            queue: this.queue,
-            currentIndex: this.currentSongIndex,
+            queue: optimizedQueue,
+            currentIndex: this.currentSongIndex - startIdx,
             currentTime: this.audio.currentTime,
             timestamp: Date.now()
         };
-        localStorage.setItem('musicplus_session', JSON.stringify(sessionData));
+        
+        try {
+            localStorage.setItem('musicplus_session', JSON.stringify(sessionData));
+        } catch (e) {
+            console.error("Failed to save session", e);
+        }
     }
     
     loadSession() {
@@ -226,7 +283,8 @@ class AudioPlayer {
             let history = JSON.parse(localStorage.getItem('listeningHistory') || '[]');
             // Remove if already exists so we can push it to the top
             history = history.filter(s => s.id !== song.id);
-            history.unshift(song);
+            const { lyrics, ...historySong } = song; // Strip large lyrics array
+            history.unshift(historySong);
             // Keep only last 50 songs
             if (history.length > 50) history.pop();
             localStorage.setItem('listeningHistory', JSON.stringify(history));

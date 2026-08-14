@@ -423,11 +423,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!currentUser.playHistory) currentUser.playHistory = [];
                 // Only add if it's not the same as the last played to prevent spam
                 if (currentUser.playHistory.length === 0 || currentUser.playHistory[currentUser.playHistory.length - 1].id !== song.id) {
-                    currentUser.playHistory.push(song);
+                    const { lyrics, ...historySong } = song; // Prevent saving large lyrics arrays
+                    currentUser.playHistory.push(historySong);
                     // Keep history capped at 50 to save space
                     if (currentUser.playHistory.length > 50) currentUser.playHistory.shift();
                     
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    try {
+                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    } catch (e) {
+                        console.error("Failed to save currentUser history", e);
+                    }
                     
                     // Update in Users DB array
                     const dbIndex = usersDB.findIndex(u => u.id === currentUser.id);
