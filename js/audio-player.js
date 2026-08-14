@@ -35,6 +35,7 @@ class AudioPlayer {
         this.drawerArtist = document.getElementById('drawer-artist');
         
         this.onSongChangeCallbacks = [];
+        this.lastSaveTime = 0;
         
         this.init();
     }
@@ -51,8 +52,9 @@ class AudioPlayer {
         this.audio.addEventListener('timeupdate', () => {
             this.updateProgress();
             // Throttle saveSession to every 5 seconds to avoid excessive writes
-            if (Math.floor(this.audio.currentTime) % 5 === 0) {
+            if (Math.abs(this.audio.currentTime - this.lastSaveTime) >= 5) {
                 this.saveSession();
+                this.lastSaveTime = this.audio.currentTime;
             }
         });
         this.audio.addEventListener('ended', () => this.handleSongEnd());
@@ -236,11 +238,13 @@ class AudioPlayer {
         }
     }
 
-    async bufferUpcomingSongs() {
-        if (this.isBufferingQueue) return;
-        this.isBufferingQueue = true;
+    bufferUpcomingSongs() {
+        if (this.bufferingPromise) return this.bufferingPromise;
         
-        try {
+        this.bufferingPromise = (async () => {
+            this.isBufferingQueue = true;
+            
+            try {
             const lastSong = this.queue[this.queue.length - 1] || this.queue[this.currentSongIndex];
             
             if (lastSong && lastSong.id) {
@@ -282,11 +286,15 @@ class AudioPlayer {
             console.error("Queue buffer failed", err);
         } finally {
             this.isBufferingQueue = false;
+            this.bufferingPromise = null;
             if (typeof renderQueue === 'function') {
                 renderQueue();
             }
             this.saveSession();
         }
+        })();
+        
+        return this.bufferingPromise;
     }
 
     playPrev() {
