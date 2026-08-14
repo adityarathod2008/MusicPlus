@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const artistsList = [
             { name: "Arijit Singh", image: "https://i.scdn.co/image/ab6761610000e5eb0261696c5df3be99da6ed3f3" },
             { name: "Taylor Swift", image: "https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0" },
-            { name: "Shreya Ghoshal", image: "https://i.scdn.co/image/ab6761610000e5eb0f0259e8633c7f9998b63e80" },
+            { name: "Shreya Ghoshal", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Shreya_Ghoshal_Behindwoods_Gold_Icons_Awards_2023_%28cropped%29.jpg/500px-Shreya_Ghoshal_Behindwoods_Gold_Icons_Awards_2023_%28cropped%29.jpg" },
             { name: "The Weeknd", image: "https://i.scdn.co/image/ab6761610000e5eb214f3cf1cbe7139c1e26ffbb" },
             { name: "Pritam", image: "https://i.scdn.co/image/ab6761610000e5ebcb6926f44f620555ba444fca" },
             { name: "Ed Sheeran", image: "https://i.scdn.co/image/ab6761610000e5eb12a2ef08d00dd7451a6dbed6" }
@@ -862,7 +862,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const card = document.createElement('div');
             card.className = 'quick-card';
             card.innerHTML = `
-                <img src="${song.cover}" alt="cover">
+                <img src="${song.cover}" alt="cover" loading="lazy">
                 <h4>${song.title}</h4>
                 <button class="quick-play-btn"><i class="fas fa-play"></i></button>
             `;
@@ -1005,7 +1005,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             item.innerHTML = `
                 <i class="fas fa-grip-vertical queue-item-drag-handle"></i>
-                <img src="${song.cover}" style="width: 40px; height: 40px; border-radius: 4px; pointer-events: none; flex-shrink: 0;">
+                <img src="${song.cover}" loading="lazy" style="width: 40px; height: 40px; border-radius: 4px; pointer-events: none; flex-shrink: 0;">
                 <div style="flex-grow: 1; pointer-events: none; overflow: hidden; min-width: 0;">
                     <div style="font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.title}</div>
                     <div style="font-size: 12px; color: var(--text-subdued); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.artist}</div>
@@ -1134,7 +1134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             item.onmouseout = () => item.style.backgroundColor = 'transparent';
             
             item.innerHTML = `
-                <img src="${song.cover}" style="width: 48px; height: 48px; border-radius: 4px;">
+                <img src="${song.cover}" loading="lazy" style="width: 48px; height: 48px; border-radius: 4px;">
                 <div style="flex-grow: 1;">
                     <div style="font-weight: 600;">${song.title}</div>
                     <div style="font-size: 14px; color: var(--text-subdued);">${song.artist}</div>
@@ -1229,7 +1229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             item.innerHTML = `
                 <div>${i + 1}</div>
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <img src="${song.cover}" style="width: 40px; height: 40px; border-radius: 4px;">
+                    <img src="${song.cover}" loading="lazy" style="width: 40px; height: 40px; border-radius: 4px;">
                     <div>
                         <div style="font-weight: 600; color: white;">${song.title}</div>
                         <div style="font-size: 14px; color: var(--text-subdued);">${song.artist}</div>
