@@ -18,9 +18,6 @@
       "use": "@vercel/static"
     }
   ],
-  "rewrites": [
-    { "source": "/", "destination": "/music_app.html" }
-  ],
   "routes": [
     {
       "src": "/api/(.*)",
