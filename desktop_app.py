@@ -10,6 +10,7 @@ import flask
 import flask_cors
 import yt_dlp
 import requests
+import ytmusicapi
 # ----------------------------------
 
 def get_base_path():
