@@ -234,15 +234,13 @@ url_cache = {}
 
 @app.route('/stream/<video_id>', methods=['GET'])
 def stream(video_id):
-    # Check cache first
     now = time.time()
+    # Check cache first
     if video_id in url_cache:
         cached = url_cache[video_id]
-        # Expire after 2 hours
         if now - cached['time'] < 7200:
-            # Proxy below using cached data
             url = cached['url']
-            yt_headers = cached['headers']
+            base_headers = cached['headers']
         else:
             del url_cache[video_id]
             url = None
@@ -254,6 +252,7 @@ def stream(video_id):
             'format': 'bestaudio[ext=m4a]/bestaudio/best',
             'quiet': True,
             'no_warnings': True,
+            'extractor_args': {'youtube': {'player_client': ['android']}},
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -261,48 +260,26 @@ def stream(video_id):
                 url = info.get('url')
                 if not url:
                     return jsonify({"error": "No streaming URL found"}), 404
-                
-                yt_headers = info.get('http_headers', {})
-                # Save to cache
-                url_cache[video_id] = {'url': url, 'headers': yt_headers, 'time': now}
+                base_headers = info.get('http_headers', {})
+                url_cache[video_id] = {'url': url, 'headers': base_headers, 'time': now}
         except Exception as e:
             print(f"Stream Extract Error: {e}")
             return jsonify({"error": str(e)}), 500
 
-    # Proxy below using cached data
+    yt_headers = dict(base_headers)
+    
+    # Forward the Range header exactly as the browser requested it
+    if 'Range' in request.headers:
+        yt_headers['Range'] = request.headers['Range']
+        
     try:
-        # Get total file size to properly handle chunking
-        head_req = requests.head(url, headers=yt_headers)
-        total_size = int(head_req.headers.get('Content-Length', 0))
-        
-        # Parse requested Range
-        range_header = request.headers.get('Range', 'bytes=0-')
-        byte_range = range_header.replace('bytes=', '').split('-')
-        start = int(byte_range[0]) if byte_range[0] else 0
-        
-        # Force max chunk size of 3MB (safely under Vercel's 4.5MB limit)
-        CHUNK_SIZE = 3 * 1024 * 1024
-        end = int(byte_range[1]) if len(byte_range) > 1 and byte_range[1] else start + CHUNK_SIZE - 1
-        
-        if end - start + 1 > CHUNK_SIZE:
-            end = start + CHUNK_SIZE - 1
-            
-        if total_size > 0 and end >= total_size:
-            end = total_size - 1
-            
-        yt_headers['Range'] = f"bytes={start}-{end}"
-        
         req = requests.get(url, headers=yt_headers, stream=True)
         
         excluded_headers = ['content-encoding', 'transfer-encoding', 'connection']
         resp_headers = {name: value for name, value in req.headers.items() if name.lower() not in excluded_headers}
         
-        resp_headers['Content-Range'] = f"bytes {start}-{end}/{total_size if total_size > 0 else '*'}"
-        resp_headers['Accept-Ranges'] = 'bytes'
-        resp_headers['Content-Length'] = str(end - start + 1)
-        
         return Response(req.iter_content(chunk_size=1024*1024), 
-                        status=206, 
+                        status=req.status_code, 
                         headers=resp_headers,
                         content_type=req.headers.get('Content-Type', 'audio/mp4'))
                         
