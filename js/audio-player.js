@@ -74,10 +74,16 @@ class AudioPlayer {
                     this.audio.src = '';
                     this.audio.load();
                     this.audio.src = src;
-                    this.audio.currentTime = currentTime;
+                    
+                    const onMeta = () => {
+                        this.audio.currentTime = currentTime;
+                        this.audio.removeEventListener('loadedmetadata', onMeta);
+                    };
+                    this.audio.addEventListener('loadedmetadata', onMeta);
+                    
                     this.audio.play().catch(e => console.error("Recovery failed", e));
                 }
-            }, 5000); // 5 seconds wait before recovering
+            }, 10000); // 10 seconds wait before recovering
         });
         
         this.audio.addEventListener('playing', () => {
@@ -104,7 +110,13 @@ class AudioPlayer {
                     const sep = currentSong.src.includes('?') ? '&' : '?';
                     this.audio.src = `${currentSong.src}${sep}t=${Date.now()}`;
                     this.audio.load();
-                    this.audio.currentTime = currentTime;
+                    
+                    const onMeta = () => {
+                        this.audio.currentTime = currentTime;
+                        this.audio.removeEventListener('loadedmetadata', onMeta);
+                    };
+                    this.audio.addEventListener('loadedmetadata', onMeta);
+                    
                     this.audio.play().catch(err => console.error("Retry failed", err));
                     return;
                 }
