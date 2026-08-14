@@ -148,6 +148,22 @@ class AudioPlayer {
             this.dynamicBg.style.background = `linear-gradient(to bottom, ${song.color}, var(--bg-color-base))`;
         }
         
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: song.title,
+                artist: song.artist,
+                album: song.album || 'Music+',
+                artwork: [
+                    { src: song.cover, sizes: '512x512', type: 'image/jpeg' }
+                ]
+            });
+            
+            navigator.mediaSession.setActionHandler('play', () => this.togglePlay());
+            navigator.mediaSession.setActionHandler('pause', () => this.togglePlay());
+            navigator.mediaSession.setActionHandler('previoustrack', () => this.playPrev());
+            navigator.mediaSession.setActionHandler('nexttrack', () => this.playNext());
+        }
+        
         this.onSongChangeCallbacks.forEach(cb => cb(song));
     }
 

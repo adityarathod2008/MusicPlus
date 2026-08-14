@@ -183,7 +183,7 @@ def get_related():
 
 @app.route('/download/<video_id>', methods=['GET'])
 def download(video_id):
-    # This endpoint gets the streaming URL and forces a download
+    # Return direct URL for the frontend to handle download directly
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'quiet': True,
@@ -196,27 +196,8 @@ def download(video_id):
             url = info.get('url')
             if not url:
                 return jsonify({"error": "No streaming URL found"}), 404
-                
-            yt_headers = info.get('http_headers', {})
-            req = requests.get(url, headers=yt_headers, stream=True)
             
-            excluded_headers = ['content-encoding', 'transfer-encoding', 'connection']
-            resp_headers = [(name, value) for (name, value) in req.headers.items()
-                            if name.lower() not in excluded_headers]
-            
-            # Force download with a sanitized filename to prevent browser errors
-            raw_title = info.get('title', 'song')
-            safe_title = "".join([c for c in raw_title if c.isalpha() or c.isdigit() or c == ' ']).strip()
-            if not safe_title:
-                safe_title = "song"
-            filename = f"{safe_title}.webm"
-            resp_headers.append(('Content-Disposition', f'attachment; filename="{filename}"'))
-            
-            return Response(req.iter_content(chunk_size=1024*1024), 
-                            status=req.status_code, 
-                            headers=resp_headers,
-                            content_type=req.headers.get('Content-Type'))
-                            
+            return jsonify({"url": url, "title": info.get('title', 'song')})
     except Exception as e:
         print(f"Download Error: {e}")
         return jsonify({"error": str(e)}), 500

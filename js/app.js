@@ -105,7 +105,75 @@ document.addEventListener('DOMContentLoaded', async () => {
         await fetchUsersFromBackend();
         await loadTrendingSongs();
         await loadMadeForYou();
+        await loadTopArtists();
+        await loadPopularPlaylists();
         updateGreeting();
+    }
+    
+    async function loadTopArtists() {
+        const artistsList = [
+            { name: "Arijit Singh", image: "https://i.scdn.co/image/ab6761610000e5eb0261696c5df3be99da6ed3f3" },
+            { name: "Taylor Swift", image: "https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0" },
+            { name: "Shreya Ghoshal", image: "https://i.scdn.co/image/ab6761610000e5eb0f0259e8633c7f9998b63e80" },
+            { name: "The Weeknd", image: "https://i.scdn.co/image/ab6761610000e5eb214f3cf1cbe7139c1e26ffbb" },
+            { name: "Pritam", image: "https://i.scdn.co/image/ab6761610000e5ebcb6926f44f620555ba444fca" },
+            { name: "Ed Sheeran", image: "https://i.scdn.co/image/ab6761610000e5eb12a2ef08d00dd7451a6dbed6" }
+        ];
+        
+        const container = document.getElementById('top-artists');
+        if (!container) return;
+        document.getElementById('top-artists-section').style.display = 'block';
+        container.innerHTML = '';
+        
+        artistsList.forEach(artist => {
+            const card = document.createElement('div');
+            card.className = 'artist-card';
+            card.innerHTML = `
+                <img src="${artist.image}" alt="${artist.name}" loading="lazy">
+                <h4>${artist.name}</h4>
+                <p>Artist</p>
+            `;
+            card.addEventListener('click', () => {
+                // Switch to search view and search artist
+                document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
+                document.querySelector('.nav-links li[data-view="search"]').classList.add('active');
+                document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active-view'));
+                document.getElementById('search-view').classList.add('active-view');
+                
+                searchInput.value = artist.name;
+                searchInput.dispatchEvent(new Event('input'));
+            });
+            container.appendChild(card);
+        });
+    }
+
+    async function loadPopularPlaylists() {
+        document.getElementById('popular-playlists-section').style.display = 'block';
+        const container = document.getElementById('popular-playlists');
+        container.innerHTML = '<div class="loading-spinner" style="padding: 20px;">Fetching Playlists...</div>';
+        
+        try {
+            const queries = ["Bollywood Hits", "Workout Music", "Chill Vibes", "Top 50 Global"];
+            const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+            
+            document.querySelector('#popular-playlists-section h2').textContent = randomQuery;
+            
+            const response = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(randomQuery)}`);
+            const data = await response.json();
+            
+            container.innerHTML = '';
+            if (data.results && data.results.length > 0) {
+                data.results.slice(0, 6).forEach((song, index) => {
+                    const card = createMusicCard(song, index, data.results);
+                    container.appendChild(card);
+                });
+            } else {
+                document.getElementById('popular-playlists-section').style.display = 'none';
+            }
+        } catch (e) {
+            console.error("Failed to load playlists", e);
+            document.getElementById('popular-playlists-section').style.display = 'none';
+        }
     }
     
     async function loadMadeForYou() {
@@ -312,31 +380,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                         return;
                     }
                     
-                    const downloadUrl = `${BACKEND_URL}/download/${currentActiveSong.id}`;
+                    const downloadApiUrl = `${BACKEND_URL}/download/${currentActiveSong.id}`;
                     
                     // Show loading state
                     const originalIcon = downloadBtn.innerHTML;
                     downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                     
                     try {
-                        const response = await fetch(downloadUrl);
-                        if (!response.ok) throw new Error("Download failed");
-                        const blob = await response.blob();
+                        const response = await fetch(downloadApiUrl);
+                        const data = await response.json();
+                        if (!data.url) throw new Error("No download URL returned");
                         
-                        await musicDB.saveSong(currentActiveSong, blob);
-                        downloadBtn.style.color = 'var(--accent-color)';
+                        // Trigger native browser download/open since CORS prevents saving to IndexedDB
+                        window.open(data.url, '_blank');
                         
-                        // Show toast/alert
-                        const oldContent = downloadBtn.innerHTML;
                         downloadBtn.innerHTML = '<i class="fas fa-check"></i>';
                         setTimeout(() => downloadBtn.innerHTML = originalIcon, 2000);
-                        
-                        if (document.getElementById('downloads-view').classList.contains('active-view')) {
-                            renderDownloads();
-                        }
                     } catch (e) {
                         console.error("Download error:", e);
-                        alert("Failed to save song offline.");
+                        alert("Failed to fetch download link.");
                         downloadBtn.innerHTML = originalIcon;
                     }
                 }
