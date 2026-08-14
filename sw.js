@@ -2,8 +2,12 @@ const CACHE_NAME = 'musicplus-cache-v1';
 const urlsToCache = [
   '/music_app.html',
   '/style.css',
+  '/js/app.js',
   '/js/audio-player.js',
-  '/js/script.js',
+  '/js/db.js',
+  '/js/lyrics.js',
+  '/js/songs-data.js',
+  '/js/visualizer.js',
   '/landing_page/icon.png'
 ];
 
