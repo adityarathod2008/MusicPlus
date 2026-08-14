@@ -104,8 +104,62 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('greeting').textContent = "Fetching Trending Music...";
         await fetchUsersFromBackend();
         await loadTrendingSongs();
+        await loadMadeForYou();
         updateGreeting();
     }
+    
+    async function loadMadeForYou() {
+        let history = JSON.parse(localStorage.getItem('listeningHistory') || '[]');
+        if (currentUser && currentUser.playHistory) {
+            history = [...history, ...currentUser.playHistory];
+        }
+        
+        if (history.length > 0) {
+            document.getElementById('made-for-you-section').style.display = 'block';
+            const container = document.getElementById('personalized-mix');
+            container.innerHTML = '<div class="loading-spinner" style="padding: 20px;">Generating your mix...</div>';
+            
+            try {
+                // Pick one of the top 5 most recent unique songs as the seed
+                const uniqueHistory = [];
+                const seenIds = new Set();
+                for (const s of history.reverse()) {
+                    if (!seenIds.has(s.id)) {
+                        seenIds.add(s.id);
+                        uniqueHistory.push(s);
+                    }
+                }
+                
+                const seedIndex = Math.floor(Math.random() * Math.min(5, uniqueHistory.length));
+                const seedSong = uniqueHistory[seedIndex];
+                
+                if (!seedSong || !seedSong.id) throw new Error("Invalid seed song");
+                
+                const response = await fetch(`${BACKEND_URL}/related?video_id=${seedSong.id}`);
+                const data = await response.json();
+                
+                container.innerHTML = '';
+                if (data.results && data.results.length > 0) {
+                    data.results.slice(0, 10).forEach((song, index) => {
+                        const card = createMusicCard(song, index, data.results);
+                        container.appendChild(card);
+                    });
+                } else {
+                    document.getElementById('made-for-you-section').style.display = 'none';
+                }
+            } catch (e) {
+                console.error("Failed to load made for you", e);
+                document.getElementById('made-for-you-section').style.display = 'none';
+            }
+        }
+    }
+
+    // Listen for history updates
+    window.addEventListener('listeningHistoryUpdated', () => {
+        if (document.getElementById('made-for-you-section').style.display === 'none') {
+            loadMadeForYou();
+        }
+    });
     
     async function fetchUsersFromBackend() {
         try {

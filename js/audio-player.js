@@ -155,6 +155,7 @@ class AudioPlayer {
         if (song) {
             this.currentSongIndex = index;
             this.loadSong(song);
+            this.addToListeningHistory(song);
         }
         this.audio.play().then(() => {
             this.isPlaying = true;
@@ -203,94 +204,64 @@ class AudioPlayer {
         }
     }
     
+    addToListeningHistory(song) {
+        try {
+            let history = JSON.parse(localStorage.getItem('listeningHistory') || '[]');
+            // Remove if already exists so we can push it to the top
+            history = history.filter(s => s.id !== song.id);
+            history.unshift(song);
+            // Keep only last 50 songs
+            if (history.length > 50) history.pop();
+            localStorage.setItem('listeningHistory', JSON.stringify(history));
+            
+            // Dispatch event for UI to update "Made for you" if needed
+            window.dispatchEvent(new CustomEvent('listeningHistoryUpdated'));
+        } catch(e) {
+            console.error("Failed to save history", e);
+        }
+    }
+
     async bufferUpcomingSongs() {
         if (this.isBufferingQueue) return;
         this.isBufferingQueue = true;
         
         try {
-            let searchQuery;
-            // Always try to maintain the vibe of the last played song
             const lastSong = this.queue[this.queue.length - 1] || this.queue[this.currentSongIndex];
-            var currentSongName = "";
             
-            if (lastSong) {
-                let cleanTitle = lastSong.title.replace(/\s*\|.*$/g, '').replace(/\s*\([^)]*\)/g, '').replace(/\s*\[[^\]]*\]/g, '').replace(/(official|video|audio|lyric|lyrics|full song)/gi, '').trim();
-                let artistOrTitle = cleanTitle.split('-')[0].trim();
-                currentSongName = cleanTitle.split('-').pop().trim().toLowerCase();
+            if (lastSong && lastSong.id) {
+                // Fetch related songs using the YouTube algorithm
+                const response = await fetch(`${BACKEND_URL}/related?video_id=${lastSong.id}`);
+                const data = await response.json();
                 
-                // Map of genres to similar top artists to ensure 'different artist, same vibe'
-                const genreToArtists = {
-                    "R&B/Soul": ["The Weeknd", "SZA", "Frank Ocean", "Daniel Caesar", "Brent Faiyaz", "Jhene Aiko", "H.E.R.", "Kehlani", "Summer Walker", "Giveon"],
-                    "Pop": ["Taylor Swift", "Ariana Grande", "Dua Lipa", "Ed Sheeran", "Harry Styles", "Justin Bieber", "Bruno Mars", "The Weeknd"],
-                    "Hip-Hop/Rap": ["Drake", "Kendrick Lamar", "J. Cole", "Travis Scott", "Future", "Metro Boomin", "21 Savage"],
-                    "Rock": ["Arctic Monkeys", "Coldplay", "Imagine Dragons", "The Killers", "Nirvana", "Linkin Park"],
-                    "Alternative": ["Billie Eilish", "Lana Del Rey", "Tame Impala", "Gorillaz", "The Neighbourhood", "Arctic Monkeys"],
-                    "Bollywood": ["Arijit Singh", "Atif Aslam", "Pritam", "Shreya Ghoshal", "Jubin Nautiyal", "Anirudh Ravichander", "Darshan Raval"],
-                    "Indian Pop": ["Arijit Singh", "Darshan Raval", "Anuv Jain", "Prateek Kuhad", "King", "AP Dhillon"]
-                };
-                
-                try {
-                    // Ask iTunes for the genre of the current song
-                    const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanTitle)}&entity=song&limit=1`);
-                    const itunesData = await itunesRes.json();
-                    let matchedGenre = false;
+                if (data.results && data.results.length > 0) {
+                    const existingIds = new Set(this.queue.map(s => s.id));
+                    const newSongs = data.results.filter(s => {
+                        if (existingIds.has(s.id)) return false;
+                        return true;
+                    });
                     
-                    if (itunesData.results && itunesData.results.length > 0) {
-                        const genre = itunesData.results[0].primaryGenreName;
-                        if (genreToArtists[genre]) {
-                            const artists = genreToArtists[genre];
-                            // Pick a random artist from the same genre (avoiding the current artist if possible)
-                            let randomArtist = artists[Math.floor(Math.random() * artists.length)];
-                            if (randomArtist.toLowerCase() === artistOrTitle.toLowerCase() && artists.length > 1) {
-                                randomArtist = artists.find(a => a.toLowerCase() !== artistOrTitle.toLowerCase());
-                            }
-                            searchQuery = `top hits by ${randomArtist}`;
-                            matchedGenre = true;
+                    // Add up to 10 new songs to the queue buffer
+                    const songsToAdd = newSongs.slice(0, 10);
+                    for (const song of songsToAdd) {
+                        if (!song.src) {
+                            song.src = `${BACKEND_URL}/stream/${song.id}`;
                         }
+                        this.queue.push(song);
                     }
-                    
-                    if (!matchedGenre) {
-                        // Fallback: heuristic based on hindi words
-                        const hindiWords = ['dil', 'mera', 'tu', 'hai', 'main', 'pyar', 'ishq', 'ho', 'ke', 'aur', 'hum', 'tum', 'yeh', 'kya', 'zindagi', 'tujhe', 'tera', 'meri'];
-                        const isHindi = cleanTitle.toLowerCase().split(/\s+/).some(word => hindiWords.includes(word));
-                        if (isHindi) {
-                            const artists = genreToArtists["Bollywood"];
-                            searchQuery = `top hits by ${artists[Math.floor(Math.random() * artists.length)]}`;
-                        } else {
-                            searchQuery = `${artistOrTitle} and similar artists top tracks`;
-                        }
-                    }
-                } catch(e) {
-                    searchQuery = `${artistOrTitle} and similar artists top tracks`;
                 }
             } else {
-                searchQuery = "trending music";
-            }
-            
-            const response = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(searchQuery)}`);
-            const data = await response.json();
-            
-            if (data.results && data.results.length > 0) {
-                const existingIds = new Set(this.queue.map(s => s.id));
-                const newSongs = data.results.filter(s => {
-                    if (existingIds.has(s.id)) return false;
-                    // Filter out variations of the exact same song
-                    if (currentSongName && currentSongName.length > 3 && s.title.toLowerCase().includes(currentSongName)) return false;
-                    return true;
-                });
-                
-                // Add up to 10 new songs to the queue buffer
-                const songsToAdd = newSongs.slice(0, 10);
-                for (const song of songsToAdd) {
-                    if (!song.src) {
-                        song.src = `${BACKEND_URL}/stream/${song.id}`;
+                // Fallback to trending search if no last song
+                const response = await fetch(`${BACKEND_URL}/search?q=trending+music`);
+                const data = await response.json();
+                if (data.results && data.results.length > 0) {
+                    for (const song of data.results.slice(0, 5)) {
+                        if (!song.src) song.src = `${BACKEND_URL}/stream/${song.id}`;
+                        this.queue.push(song);
                     }
-                    this.queue.push(song);
+                } else {
+                    const randomFallback = songs[Math.floor(Math.random() * songs.length)];
+                    this.queue.push(randomFallback);
                 }
-            } else {
-                // Fallback to static global list
-                const randomFallback = songs[Math.floor(Math.random() * songs.length)];
-                this.queue.push(randomFallback);
             }
         } catch (err) {
             console.error("Queue buffer failed", err);

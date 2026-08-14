@@ -6,7 +6,9 @@ import yt_dlp
 import requests
 import sqlite3
 from datetime import datetime
+import ytmusicapi
 
+ytmusic = ytmusicapi.YTMusic()
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes so the frontend can hit this API
 
@@ -128,6 +130,55 @@ def search():
             return jsonify({"results": results})
     except Exception as e:
         print(f"Search Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/related', methods=['GET'])
+def get_related():
+    video_id = request.args.get('video_id', '')
+    if not video_id:
+        return jsonify({"error": "No video_id provided"}), 400
+    
+    try:
+        # Get the watch playlist (radio) for this video
+        playlist = ytmusic.get_watch_playlist(videoId=video_id, limit=15)
+        
+        results = []
+        if 'tracks' in playlist:
+            for track in playlist['tracks']:
+                if not track.get('videoId'):
+                    continue
+                    
+                # Format artist string
+                artists = [a['name'] for a in track.get('artists', [])]
+                artist_name = ", ".join(artists) if artists else 'Unknown Artist'
+                
+                # Get best thumbnail
+                thumbnails = track.get('thumbnails', [])
+                cover = thumbnails[-1]['url'] if thumbnails else f"https://i.ytimg.com/vi/{track['videoId']}/hqdefault.jpg"
+                
+                # Convert duration like "3:45" to seconds (approximate if needed, though frontend handles strings or numbers if we just pass a number, wait, the search endpoint passes seconds: `duration: entry.get('duration', 180)`).
+                # Actually ytmusicapi returns length as string "3:45" sometimes. 
+                # Let's try to convert it.
+                lengthStr = track.get('length', '3:00')
+                duration_sec = 180
+                if lengthStr and ':' in lengthStr:
+                    parts = lengthStr.split(':')
+                    if len(parts) == 2:
+                        duration_sec = int(parts[0]) * 60 + int(parts[1])
+                    elif len(parts) == 3:
+                        duration_sec = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                
+                results.append({
+                    'id': track['videoId'],
+                    'title': track.get('title', 'Unknown Title'),
+                    'artist': artist_name,
+                    'duration': duration_sec,
+                    'cover': cover
+                })
+                
+        return jsonify({"results": results})
+    except Exception as e:
+        print(f"Related Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/download/<video_id>', methods=['GET'])
