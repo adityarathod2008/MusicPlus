@@ -240,6 +240,8 @@ def stream(video_id):
         cached = url_cache[video_id]
         # Expire after 2 hours
         if now - cached['time'] < 7200:
+            if os.environ.get('VERCEL') != '1':
+                return redirect(cached['url'])
             # Proxy below using cached data
             url = cached['url']
             yt_headers = cached['headers']
@@ -269,7 +271,11 @@ def stream(video_id):
             print(f"Stream Extract Error: {e}")
             return jsonify({"error": str(e)}), 500
 
-    # Proxy logic (to avoid 403 IP mismatch and User-Agent strictness)
+    # If running locally in the Pyinstaller app, just redirect the browser to the YouTube URL!
+    if os.environ.get('VERCEL') != '1':
+        return redirect(url)
+
+    # Vercel proxy logic
     try:
         # Get total file size to properly handle chunking
         head_req = requests.head(url, headers=yt_headers)
