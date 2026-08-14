@@ -99,35 +99,42 @@ def search():
     if not query:
         return jsonify({"error": "No query provided"}), 400
 
-    # yt-dlp options for FAST search (metadata only, no streaming URLs yet)
-    ydl_opts = {
-        'extract_flat': 'in_playlist',
-        'default_search': 'ytsearch15', # get top 15 results
-        'quiet': True,
-        'no_warnings': True,
-    }
-
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # We search "query audio" or "query song" to prioritize music
-            search_query = f"{query} song"
-            info = ydl.extract_info(search_query, download=False)
+        # Use ytmusicapi for accurate YouTube Music IDs instead of generic yt-dlp search
+        search_results = ytmusic.search(query, filter="songs", limit=15)
+        
+        results = []
+        for track in search_results:
+            if not track.get('videoId'):
+                continue
+                
+            artists = [a['name'] for a in track.get('artists', [])]
+            artist_name = ", ".join(artists) if artists else 'Unknown Artist'
             
-            results = []
-            if 'entries' in info:
-                for entry in info['entries']:
-                    # Some entries might not have an id or title
-                    if not entry.get('id') or not entry.get('title'):
-                        continue
-                        
-                    results.append({
-                        'id': entry['id'],
-                        'title': entry.get('title', 'Unknown Title'),
-                        'artist': entry.get('uploader', 'Unknown Artist'),
-                        'duration': entry.get('duration', 180), # in seconds
-                        'cover': f"https://i.ytimg.com/vi/{entry['id']}/hqdefault.jpg"
-                    })
-            return jsonify({"results": results})
+            thumbnails = track.get('thumbnails', [])
+            cover = thumbnails[-1]['url'] if thumbnails else f"https://i.ytimg.com/vi/{track['videoId']}/hqdefault.jpg"
+            
+            # Extract duration, ytmusicapi provides duration_seconds or duration (string)
+            duration_sec = track.get('duration_seconds')
+            if duration_sec is None:
+                duration_str = track.get('duration', '3:00')
+                parts = duration_str.split(':')
+                if len(parts) == 2:
+                    duration_sec = int(parts[0]) * 60 + int(parts[1])
+                elif len(parts) == 3:
+                    duration_sec = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                else:
+                    duration_sec = 180
+                    
+            results.append({
+                'id': track['videoId'],
+                'title': track.get('title', 'Unknown Title'),
+                'artist': artist_name,
+                'duration': duration_sec,
+                'cover': cover
+            })
+            
+        return jsonify({"results": results})
     except Exception as e:
         print(f"Search Error: {e}")
         return jsonify({"error": str(e)}), 500
@@ -204,7 +211,7 @@ def download(video_id):
 
 @app.route('/stream/<video_id>', methods=['GET'])
 def stream(video_id):
-    # This endpoint gets the streaming URL and proxies it to fix CORS
+    # This endpoint gets the streaming URL and redirects to it to bypass Vercel limits
     ydl_opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'quiet': True,
@@ -218,24 +225,7 @@ def stream(video_id):
             if not url:
                 return jsonify({"error": "No streaming URL found"}), 404
                 
-            # Use yt-dlp's headers to prevent YouTube from blocking the request
-            yt_headers = info.get('http_headers', {})
-            
-            # Forward the Range header so scrubbing/seeking works
-            if 'Range' in request.headers:
-                yt_headers['Range'] = request.headers['Range']
-                
-            req = requests.get(url, headers=yt_headers, stream=True)
-            
-            # Forward the response headers back to the browser
-            excluded_headers = ['content-encoding', 'transfer-encoding', 'connection']
-            resp_headers = [(name, value) for (name, value) in req.headers.items()
-                            if name.lower() not in excluded_headers]
-            
-            return Response(req.iter_content(chunk_size=1024*1024), 
-                            status=req.status_code, 
-                            headers=resp_headers,
-                            content_type=req.headers.get('Content-Type'))
+            return redirect(url)
                             
     except Exception as e:
         print(f"Stream Error: {e}")
