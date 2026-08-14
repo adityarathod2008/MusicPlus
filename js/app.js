@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const artistsList = [
             { name: "Arijit Singh", image: "https://i.scdn.co/image/ab6761610000e5eb0261696c5df3be99da6ed3f3" },
             { name: "Taylor Swift", image: "https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0" },
-            { name: "Shreya Ghoshal", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Shreya_Ghoshal_Behindwoods_Gold_Icons_Awards_2023_%28cropped%29.jpg/500px-Shreya_Ghoshal_Behindwoods_Gold_Icons_Awards_2023_%28cropped%29.jpg" },
+            { name: "Shreya Ghoshal", image: "https://upload.wikimedia.org/wikipedia/commons/2/29/Shreya_Ghoshal_at_the_61st_Filmfare_Awards.jpg" },
             { name: "The Weeknd", image: "https://i.scdn.co/image/ab6761610000e5eb214f3cf1cbe7139c1e26ffbb" },
             { name: "Pritam", image: "https://i.scdn.co/image/ab6761610000e5ebcb6926f44f620555ba444fca" },
             { name: "Ed Sheeran", image: "https://i.scdn.co/image/ab6761610000e5eb12a2ef08d00dd7451a6dbed6" }
