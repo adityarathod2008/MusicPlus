@@ -229,25 +229,54 @@ def download(video_id):
         print(f"Download Error: {e}")
         return jsonify({"error": str(e)}), 500
 
+import time
+url_cache = {}
+
 @app.route('/stream/<video_id>', methods=['GET'])
 def stream(video_id):
-    # Proxy the stream in chunks to bypass Vercel's 10s and 4.5MB limits
-    # while also preventing YouTube's 403 Forbidden IP mismatch
-    ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'quiet': True,
-        'no_warnings': True,
-    }
-    
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            url = info.get('url')
-            if not url:
-                return jsonify({"error": "No streaming URL found"}), 404
+    # Check cache first
+    now = time.time()
+    if video_id in url_cache:
+        cached = url_cache[video_id]
+        # Expire after 2 hours
+        if now - cached['time'] < 7200:
+            if os.environ.get('VERCEL') != '1':
+                return redirect(cached['url'])
+            # Otherwise proxy below using cached data
+            url = cached['url']
+            yt_headers = cached['headers']
+        else:
+            del url_cache[video_id]
+            url = None
+    else:
+        url = None
+
+    if not url:
+        ydl_opts = {
+            'format': 'bestaudio[ext=m4a]/bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+                url = info.get('url')
+                if not url:
+                    return jsonify({"error": "No streaming URL found"}), 404
                 
-            yt_headers = info.get('http_headers', {})
-            
+                yt_headers = info.get('http_headers', {})
+                # Save to cache
+                url_cache[video_id] = {'url': url, 'headers': yt_headers, 'time': now}
+        except Exception as e:
+            print(f"Stream Extract Error: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    # If running locally in the Pyinstaller app, just redirect the browser to the YouTube URL!
+    # This offloads the streaming to the browser and stops the Flask server from locking up.
+    if os.environ.get('VERCEL') != '1':
+        return redirect(url)
+
+    # Vercel proxy logic (to avoid 403 IP mismatch)
             # Get total file size to properly handle chunking
             head_req = requests.head(url, headers=yt_headers)
             total_size = int(head_req.headers.get('Content-Length', 0))
