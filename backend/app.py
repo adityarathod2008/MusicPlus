@@ -212,7 +212,7 @@ def get_related():
 def download(video_id):
     # Return direct URL for the frontend to handle download directly
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        'format': 'bestaudio/best', # Removed ext=m4a restriction to allow highest bitrate (often Opus 160kbps)
         'quiet': True,
         'no_warnings': True,
     }
@@ -253,7 +253,7 @@ def stream(video_id):
 
     if not url:
         ydl_opts = {
-            'format': 'bestaudio[ext=m4a]/bestaudio/best',
+            'format': 'bestaudio/best', # Removed ext=m4a restriction to allow highest bitrate (often Opus 160kbps)
             'quiet': True,
             'no_warnings': True,
         }
