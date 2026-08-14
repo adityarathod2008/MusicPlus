@@ -144,9 +144,8 @@ class AudioPlayer {
         this.drawerArtist.textContent = song.artist;
         this.drawerCover.src = song.cover;
         
-        if (song.color) {
-            this.dynamicBg.style.background = `linear-gradient(to bottom, ${song.color}, var(--bg-color-base))`;
-        }
+        const bgColor = song.color || '#1DB954';
+        this.dynamicBg.style.background = `linear-gradient(to bottom, ${bgColor}, var(--bg-color-base))`;
         
         if ('mediaSession' in navigator) {
             navigator.mediaSession.metadata = new MediaMetadata({

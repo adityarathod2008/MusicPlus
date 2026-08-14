@@ -7,10 +7,30 @@ import requests
 import sqlite3
 from datetime import datetime
 import ytmusicapi
+import sys
 
 ytmusic = ytmusicapi.YTMusic()
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes so the frontend can hit this API
+
+def get_base_path():
+    try:
+        return sys._MEIPASS
+    except Exception:
+        return os.path.dirname(os.path.dirname(__file__))
+
+base_path = get_base_path()
+
+from flask import send_from_directory
+
+@app.route('/')
+def serve_index():
+    return send_from_directory(base_path, 'music_app.html')
+
+@app.route('/<path:filename>')
+def serve_static(filename):
+    return send_from_directory(base_path, filename)
+
 
 # Use /tmp for sqlite on Vercel, otherwise save to user's home directory to avoid dropping files randomly
 if os.environ.get('VERCEL') == '1':

@@ -43,10 +43,10 @@ if __name__ == '__main__':
     # Give the backend a second to start
     time.sleep(1)
 
-    # Get the absolute path to music_app.html
-    html_file = os.path.join(base_path, 'music_app.html')
-    # Formatting for file URL
-    url = f'file:///{html_file.replace(os.sep, "/")}'
+    # Wait slightly longer to ensure Flask is serving
+    time.sleep(1.5)
+
+    url = 'http://127.0.0.1:5000/'
     
     print(f"Opening native window with URL: {url}")
     

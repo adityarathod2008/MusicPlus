@@ -182,42 +182,126 @@ document.addEventListener('DOMContentLoaded', async () => {
             history = [...history, ...currentUser.playHistory];
         }
         
-        if (history.length > 0) {
+        let likes = currentUser ? (currentUser.likedSongs || []) : [];
+        let combinedPool = [...history, ...likes];
+        
+        const dynamicContainer = document.getElementById('dynamic-shelves-container');
+        if (dynamicContainer) dynamicContainer.innerHTML = '';
+        
+        if (combinedPool.length > 0) {
             document.getElementById('made-for-you-section').style.display = 'block';
             const container = document.getElementById('personalized-mix');
             container.innerHTML = '<div class="loading-spinner" style="padding: 20px;">Generating your mix...</div>';
             
             try {
-                // Pick one of the top 5 most recent unique songs as the seed
                 const uniqueHistory = [];
                 const seenIds = new Set();
-                for (const s of history.reverse()) {
+                for (const s of combinedPool.reverse()) {
                     if (!seenIds.has(s.id)) {
                         seenIds.add(s.id);
                         uniqueHistory.push(s);
                     }
                 }
                 
-                const seedIndex = Math.floor(Math.random() * Math.min(5, uniqueHistory.length));
-                const seedSong = uniqueHistory[seedIndex];
+                const shuffledSeeds = [...uniqueHistory].sort(() => 0.5 - Math.random());
+                const seeds = shuffledSeeds.slice(0, 3);
                 
-                if (!seedSong || !seedSong.id) throw new Error("Invalid seed song");
+                const primarySeed = seeds[0];
+                if (primarySeed && primarySeed.id) {
+                    const response = await fetch(`${BACKEND_URL}/related?video_id=${primarySeed.id}`);
+                    const data = await response.json();
+                    
+                    container.innerHTML = '';
+                    if (data.results && data.results.length > 0) {
+                        data.results.slice(0, 6).forEach((song, index) => {
+                            const card = createMusicCard(song, index, data.results);
+                            container.appendChild(card);
+                        });
+                    } else {
+                        document.getElementById('made-for-you-section').style.display = 'none';
+                    }
+                }
                 
-                const response = await fetch(`${BACKEND_URL}/related?video_id=${seedSong.id}`);
-                const data = await response.json();
-                
-                container.innerHTML = '';
-                if (data.results && data.results.length > 0) {
-                    data.results.slice(0, 10).forEach((song, index) => {
-                        const card = createMusicCard(song, index, data.results);
-                        container.appendChild(card);
-                    });
-                } else {
-                    document.getElementById('made-for-you-section').style.display = 'none';
+                if (dynamicContainer) {
+                    for (let i = 1; i < seeds.length; i++) {
+                        const seed = seeds[i];
+                        if (seed && seed.id) {
+                            const section = document.createElement('section');
+                            section.className = 'shelf-section';
+                            section.innerHTML = `
+                                <div class="shelf-header">
+                                    <h2>More like ${seed.title}</h2>
+                                    <span class="show-all">Because you liked it</span>
+                                </div>
+                                <div class="cards-container" id="dynamic-shelf-${i}">
+                                    <div class="loading-spinner" style="padding: 20px;">Loading...</div>
+                                </div>
+                            `;
+                            dynamicContainer.appendChild(section);
+                            
+                            const res = await fetch(`${BACKEND_URL}/related?video_id=${seed.id}`);
+                            const d = await res.json();
+                            
+                            const shelfContainer = document.getElementById(`dynamic-shelf-${i}`);
+                            shelfContainer.innerHTML = '';
+                            if (d.results && d.results.length > 0) {
+                                d.results.slice(0, 6).forEach((song, index) => {
+                                    const card = createMusicCard(song, index, d.results);
+                                    shelfContainer.appendChild(card);
+                                });
+                            } else {
+                                section.style.display = 'none';
+                            }
+                        }
+                    }
                 }
             } catch (e) {
                 console.error("Failed to load made for you", e);
                 document.getElementById('made-for-you-section').style.display = 'none';
+            }
+        } else {
+            document.getElementById('made-for-you-section').style.display = 'none';
+            if (dynamicContainer) {
+                const defaultQueries = [
+                    { title: "Bollywood Top Hits", query: "Bollywood Top 50" },
+                    { title: "Workout Mix", query: "Workout Gym Music" },
+                    { title: "Pop Anthems", query: "Pop Music Hits 2024" },
+                    { title: "Chill & Relax", query: "Lofi Hip Hop Chill" }
+                ];
+                
+                for (let i = 0; i < defaultQueries.length; i++) {
+                    const dq = defaultQueries[i];
+                    const section = document.createElement('section');
+                    section.className = 'shelf-section';
+                    section.innerHTML = `
+                        <div class="shelf-header">
+                            <h2>${dq.title}</h2>
+                        </div>
+                        <div class="cards-container" id="default-shelf-${i}">
+                            <div class="loading-spinner" style="padding: 20px;">Loading...</div>
+                        </div>
+                    `;
+                    dynamicContainer.appendChild(section);
+                    
+                    try {
+                        const res = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(dq.query)}`);
+                        const d = await res.json();
+                        
+                        const shelfContainer = document.getElementById(`default-shelf-${i}`);
+                        shelfContainer.innerHTML = '';
+                        if (d.results && d.results.length > 0) {
+                            d.results.slice(0, 6).forEach((song, index) => {
+                                const card = createMusicCard(song, index, d.results);
+                                shelfContainer.appendChild(card);
+                            });
+                        } else {
+                            section.style.display = 'none';
+                        }
+                    } catch (e) {
+                        console.error("Failed to load default shelf", e);
+                        section.style.display = 'none';
+                    }
+                }
             }
         }
     }
