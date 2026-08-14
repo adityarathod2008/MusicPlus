@@ -5,8 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Music+</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/landing_page/icon.png">
+    <meta name="theme-color" content="#121212">
     <link rel="stylesheet" href="style.css?v=17">
-    <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
@@ -409,6 +411,19 @@
     <script src="js/lyrics.js?v=99"></script>
     <script src="js/audio-player.js?v=99"></script>
     <script src="js/app.js?v=99"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful');
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
 </body>
 
 </html>
