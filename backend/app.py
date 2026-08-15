@@ -278,7 +278,7 @@ def stream(video_id):
         excluded_headers = ['content-encoding', 'transfer-encoding', 'connection']
         resp_headers = {name: value for name, value in req.headers.items() if name.lower() not in excluded_headers}
         
-        return Response(req.iter_content(chunk_size=1024*1024), 
+        return Response(req.iter_content(chunk_size=32768), 
                         status=req.status_code, 
                         headers=resp_headers,
                         content_type=req.headers.get('Content-Type', 'audio/mp4'))
