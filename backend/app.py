@@ -234,10 +234,11 @@ url_cache = {}
 
 @app.route('/stream/<video_id>', methods=['GET'])
 def stream(video_id):
-    now = time.time()
     # Check cache first
+    now = time.time()
     if video_id in url_cache:
         cached = url_cache[video_id]
+        # Expire after 2 hours
         if now - cached['time'] < 7200:
             url = cached['url']
             base_headers = cached['headers']
@@ -260,6 +261,7 @@ def stream(video_id):
                 url = info.get('url')
                 if not url:
                     return jsonify({"error": "No streaming URL found"}), 404
+                
                 base_headers = info.get('http_headers', {})
                 url_cache[video_id] = {'url': url, 'headers': base_headers, 'time': now}
         except Exception as e:
@@ -268,18 +270,47 @@ def stream(video_id):
 
     yt_headers = dict(base_headers)
     
-    # Forward the Range header exactly as the browser requested it
-    if 'Range' in request.headers:
-        yt_headers['Range'] = request.headers['Range']
-        
     try:
+        # Get total file size to properly handle chunking
+        head_req = requests.head(url, headers=yt_headers)
+        total_size = int(head_req.headers.get('Content-Length', 0))
+        
+        # Parse requested Range
+        range_header = request.headers.get('Range', 'bytes=0-')
+        byte_range = range_header.replace('bytes=', '').split('-')
+        start = int(byte_range[0]) if byte_range[0] else 0
+        
+        # Force max chunk size of 3MB (safely under Vercel's 4.5MB limit)
+        CHUNK_SIZE = 3 * 1024 * 1024
+        end = int(byte_range[1]) if len(byte_range) > 1 and byte_range[1] else start + CHUNK_SIZE - 1
+        
+        if end - start + 1 > CHUNK_SIZE:
+            end = start + CHUNK_SIZE - 1
+            
+        if total_size > 0 and end >= total_size:
+            end = total_size - 1
+            
+        yt_headers['Range'] = f"bytes={start}-{end}"
+        
         req = requests.get(url, headers=yt_headers, stream=True)
         
         excluded_headers = ['content-encoding', 'transfer-encoding', 'connection']
         resp_headers = {name: value for name, value in req.headers.items() if name.lower() not in excluded_headers}
         
-        return Response(req.iter_content(chunk_size=32768), 
-                        status=req.status_code, 
+        resp_headers['Content-Range'] = f"bytes {start}-{end}/{total_size if total_size > 0 else '*'}"
+        resp_headers['Accept-Ranges'] = 'bytes'
+        resp_headers['Content-Length'] = str(end - start + 1)
+        
+        def generate():
+            try:
+                for chunk in req.iter_content(chunk_size=32768):
+                    if chunk:
+                        yield chunk
+            finally:
+                req.close()
+                
+        return Response(generate(), 
+                        status=206, 
                         headers=resp_headers,
                         content_type=req.headers.get('Content-Type', 'audio/mp4'))
                         

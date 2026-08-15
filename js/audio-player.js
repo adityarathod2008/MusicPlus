@@ -83,7 +83,7 @@ class AudioPlayer {
                     
                     this.audio.play().catch(e => console.error("Recovery failed", e));
                 }
-            }, 10000); // 10 seconds wait before recovering
+            }, 30000); // 30 seconds wait before recovering
         });
         
         this.audio.addEventListener('playing', () => {
